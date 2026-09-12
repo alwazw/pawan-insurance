@@ -12,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-  <script src="https://js.stripe.com/v3/"></script>  
-  
+  <script src="https://js.stripe.com/v3/"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -756,7 +756,6 @@
             <span id="stripeIntentIdText">pi_...</span>
           </span>
         </div>
-
         <!-- Stripe Payment Element (v2) -->
         <div id="stripePaymentElementContainer" class="hidden space-y-3">
           <div id="payment-element" class="p-3 rounded-xl bg-white border border-slate-200 min-h-[44px]"></div>
@@ -764,7 +763,6 @@
             <i class="fa-solid fa-lock"></i><span>Pay Now</span>
           </button>
         </div>
-
 
         <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center gap-4">
           <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-[#635BFF] shrink-0" id="stripeSpinnerIcon">
@@ -816,7 +814,6 @@
           <input type="url" id="workerUrlInput" placeholder="https://amy-stripe-api.yourusername.workers.dev" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
           <p class="text-[10px] text-slate-500 mt-1">Saved locally on this device. Never commits your secret keys to HTML.</p>
         </div>
-
         <div class="pt-1">
           <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-1.5">Stripe Publishable Key (pk_…)</label>
           <input type="text" id="stripePkInput" placeholder="pk_test_..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
@@ -935,8 +932,13 @@
       return (stored && stored.trim() !== '') ? stored.trim().replace(/\/$/, '') : DEFAULT_WORKER_URL;
     }
 
+    function getStripePk() {
+      return localStorage.getItem('amy_stripe_pk') || '';
+    }
+
     function openGatewaySettingsModal() {
       document.getElementById('workerUrlInput').value = getWorkerUrl();
+      document.getElementById('stripePkInput').value = getStripePk();
       document.getElementById('gatewaySettingsModal').classList.remove('hidden');
     }
 
@@ -946,11 +948,16 @@
 
     function saveGatewaySettings() {
       const val = document.getElementById('workerUrlInput').value.trim().replace(/\/$/, '');
+      const pk = document.getElementById('stripePkInput').value.trim();
       if (!val.startsWith('http://') && !val.startsWith('https://')) {
         return showToast('Invalid URL. Must begin with https://', 'error');
       }
+      if (pk && !pk.startsWith('pk_')) {
+        return showToast('Publishable key must start with pk_', 'error');
+      }
       localStorage.setItem('amy_stripe_worker_url', val);
-      showToast('Gateway URL saved successfully!', 'success');
+      localStorage.setItem('amy_stripe_pk', pk);
+      showToast('Gateway settings saved successfully!', 'success');
       closeGatewaySettingsModal();
     }
 
@@ -1274,71 +1281,110 @@
       recalculateQuote(); 
     }
 
+    // ---- Stripe Payment Element state ----
+    let stripeInstance = null;
+    let stripeElements = null;
+    let currentPaymentIntentId = null;
+
     async function initiateRealStripePayment(amount, description, callback) {
       if (amount < 0.50) {
         return showToast("Transaction amount must be at least $0.50 CAD to process via Stripe.", "error");
       }
 
       const workerUrl = getWorkerUrl();
+      const pk = getStripePk();
+
       if (workerUrl.includes("yourusername")) {
         openGatewaySettingsModal();
         return showToast("Please configure your live Cloudflare Worker URL before charging.", "error");
       }
+      if (!pk) {
+        openGatewaySettingsModal();
+        return showToast("Please add your Stripe Publishable Key (pk_...) before charging.", "error");
+      }
 
       pendingTransaction = { amount, description, callback };
+      currentPaymentIntentId = null;
 
       document.getElementById('stripeTxAmount').textContent = `$${amount.toFixed(2)}`;
       document.getElementById('stripeTxDesc').textContent = description;
-      document.getElementById('stripeStatusText').textContent = "Connecting to Cloudflare Gateway...";
-      document.getElementById('stripeSubtext').textContent = "Requesting PaymentIntent from Stripe...";
       document.getElementById('stripeIntentBadge').classList.add('hidden');
       document.getElementById('stripeModalErrorBox').classList.add('hidden');
+      document.getElementById('stripePaymentElementContainer').classList.add('hidden');
       document.getElementById('stripePollCounter').textContent = "Attempt: 0";
-      document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-circle-notch animate-spin text-xl"></i>`;
+      setStripeStatus("Connecting to Cloudflare Gateway...", "Creating secure PaymentIntent with Stripe...", true);
       document.getElementById('stripeGatewayModal').classList.remove('hidden');
 
       try {
         const response = await fetch(`${workerUrl}/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: amount,
-            currency: "cad",
-            description: description
-          })
+          body: JSON.stringify({ amount: amount, currency: "cad", description: description })
         });
-
         const data = await response.json();
 
         if (!response.ok || data.error) {
           throw new Error(data.error || `HTTP ${response.status} from Gateway`);
         }
-
-        const intentId = data.paymentIntentId;
-        if (!intentId) {
-          throw new Error("Worker returned success but missing paymentIntentId");
+        if (!data.paymentIntentId || !data.clientSecret) {
+          throw new Error("Worker response missing paymentIntentId or clientSecret");
         }
 
-        // Show live Intent ID on modal
-        document.getElementById('stripeIntentIdText').textContent = intentId;
+        currentPaymentIntentId = data.paymentIntentId;
+        document.getElementById('stripeIntentIdText').textContent = data.paymentIntentId;
         document.getElementById('stripeIntentBadge').classList.remove('hidden');
-        document.getElementById('stripeStatusText').textContent = "Awaiting Terminal / Link Payment...";
-        document.getElementById('stripeSubtext').textContent = "Customer must tap on terminal or complete link. Polling every 3s...";
 
-        // Start REAL live polling against the Cloudflare Worker
-        pollStripeStatus(intentId, callback);
+        stripeInstance = Stripe(pk);
+        stripeElements = stripeInstance.elements({ clientSecret: data.clientSecret });
+        const paymentElement = stripeElements.create('payment');
+        paymentElement.mount('#payment-element');
+        document.getElementById('stripePaymentElementContainer').classList.remove('hidden');
 
+        setStripeStatus("Awaiting payment", "Enter card details and press Pay Now.", false);
+        document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-credit-card text-xl"></i>`;
       } catch (err) {
         console.error("Stripe initiation error:", err);
-        document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-500 text-xl"></i>`;
-        document.getElementById('stripeStatusText').textContent = "Gateway Connection Failed";
-        document.getElementById('stripeSubtext').textContent = "Could not create PaymentIntent in Stripe.";
-        document.getElementById('stripeModalErrorText').textContent = err.message;
-        document.getElementById('stripeModalErrorBox').classList.remove('hidden');
+        showStripeError(err.message, "Could not create PaymentIntent in Stripe.");
       }
     }
 
-    function pollStripeStatus(intentId, successCallback) {
+    async function submitStripePayment() {
+      if (!stripeInstance || !stripeElements) {
+        return showStripeError("Payment form not ready. Please retry the transaction.", "");
+      }
+      setStripeStatus("Processing payment...", "Confirming with Stripe...", true);
+      document.getElementById('stripeModalErrorBox').classList.add('hidden');
+
+      const { error, paymentIntent } = await stripeInstance.confirmPayment({
+        elements: stripeElements,
+        confirmParams: { return_url: window.location.href },
+        redirect: 'if_required'
+      });
+
+      if (error) {
+        return showStripeError(error.message || "Payment confirmation failed.", "");
+      }
+
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        finishPaymentSuccess();
+      } else if (paymentIntent && (paymentIntent.status === 'processing' || paymentIntent.status === 'requires_capture')) {
+        setStripeStatus("Processing...", "Waiting for Stripe to settle the payment.", true);
+        pollStripeStatus(currentPaymentIntentId);
+      } else {
+        showStripeError(`Payment not completed (status: ${paymentIntent ? paymentIntent.status : 'unknown'}).`, "");
+      }
+    }
+
+    function finishPaymentSuccess() {
+      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      document.getElementById('stripeGatewayModal').classList.add('hidden');
+      const cb = pendingTransaction && pendingTransaction.callback;
+      resetStripeState();
+      showToast('Stripe Payment Cleared! Record saved.', 'success');
+      if (cb) cb();
+    }
+
+    function pollStripeStatus(intentId) {
       if (pollingInterval) clearInterval(pollingInterval);
       const workerUrl = getWorkerUrl();
       let pollCount = 0;
@@ -1347,31 +1393,15 @@
         try {
           pollCount++;
           document.getElementById('stripePollCounter').textContent = `Poll #${pollCount}`;
-
-          const res = await fetch(`${workerUrl}/check?id=${encodeURIComponent(intentId)}`, {
-            method: "GET"
-          });
-
-          if (!res.ok) {
-            console.warn(`Poll returned HTTP ${res.status}`);
-            return;
-          }
-
+          const res = await fetch(`${workerUrl}/check?id=${encodeURIComponent(intentId)}`, { method: "GET" });
+          if (!res.ok) { console.warn(`Poll returned HTTP ${res.status}`); return; }
           const checkData = await res.json();
-          const status = checkData.status;
-
-          document.getElementById('stripeSubtext').textContent = `Current status on Stripe: [${status}]`;
-
-          if (status === "succeeded") {
-            clearInterval(pollingInterval);
-            pollingInterval = null;
-            document.getElementById('stripeGatewayModal').classList.add('hidden');
-            showToast('Stripe Payment Cleared! Record saved.', 'success');
-            pendingTransaction = null;
-            successCallback();
-          } else if (status === "canceled") {
-            clearInterval(pollingInterval);
-            pollingInterval = null;
+          document.getElementById('stripeSubtext').textContent = `Current status on Stripe: [${checkData.status}]`;
+          if (checkData.status === "succeeded") {
+            clearInterval(pollingInterval); pollingInterval = null;
+            finishPaymentSuccess();
+          } else if (checkData.status === "canceled") {
+            clearInterval(pollingInterval); pollingInterval = null;
             cancelPayment("Payment was cancelled in Stripe.");
           }
         } catch (error) {
@@ -1381,11 +1411,34 @@
     }
 
     function cancelPayment(reason = "Transaction cancelled by operator.") {
-      if (pollingInterval) clearInterval(pollingInterval);
-      pollingInterval = null;
-      pendingTransaction = null;
+      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      resetStripeState();
       document.getElementById('stripeGatewayModal').classList.add('hidden');
       showToast(reason, 'error');
+    }
+
+    function resetStripeState() {
+      stripeElements = null;
+      stripeInstance = null;
+      currentPaymentIntentId = null;
+      pendingTransaction = null;
+      const el = document.getElementById('payment-element');
+      if (el) el.innerHTML = '';
+    }
+
+    function setStripeStatus(title, sub, spinning) {
+      document.getElementById('stripeStatusText').textContent = title;
+      document.getElementById('stripeSubtext').textContent = sub;
+      document.getElementById('stripeSpinnerIcon').innerHTML = spinning
+        ? `<i class="fa-solid fa-circle-notch animate-spin text-xl"></i>`
+        : `<i class="fa-solid fa-circle-check text-xl"></i>`;
+    }
+
+    function showStripeError(msg, subtext) {
+      document.getElementById('stripeModalErrorText').textContent = msg;
+      document.getElementById('stripeModalErrorBox').classList.remove('hidden');
+      setStripeStatus(subtext || "Transaction Failed", msg, false);
+      document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-500 text-xl"></i>`;
     }
 
     function loadSampleCustomer() {

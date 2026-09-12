@@ -1,6 +1,6 @@
 /**
  * Amy Wireless Care+ — Production Cloudflare Worker for Stripe Gateway (v2)
- * Change: /create now enables automatic_payment_methods so the returned
+ * Change vs v1: /create enables automatic_payment_methods so the returned
  * client_secret can be confirmed in the browser via Stripe.js (Payment Element).
  */
 export default {
@@ -27,11 +27,13 @@ export default {
           worker: "amy-stripe-api"
         }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
       }
+
       try {
         const testStripe = await fetch("https://api.stripe.com/v1/balance", {
           headers: { "Authorization": `Bearer ${env.STRIPE_SECRET_KEY}` }
         });
         const stripeData = await testStripe.json();
+
         if (!testStripe.ok) {
           return new Response(JSON.stringify({
             status: "error",
@@ -39,6 +41,7 @@ export default {
             stripe_status: testStripe.status
           }), { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } });
         }
+
         const isLive = env.STRIPE_SECRET_KEY.startsWith("sk_live_");
         return new Response(JSON.stringify({
           status: "ok",
@@ -66,17 +69,19 @@ export default {
           status: 400, headers: { "Content-Type": "application/json", ...corsHeaders }
         });
       }
+
       try {
-        const stripeRes = await fetch(
-          `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(intentId)}`,
-          { method: "GET", headers: { "Authorization": `Bearer ${env.STRIPE_SECRET_KEY}` } }
-        );
+        const stripeRes = await fetch(`https://api.stripe.com/v1/payment_intents/${encodeURIComponent(intentId)}`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${env.STRIPE_SECRET_KEY}` }
+        });
         const data = await stripeRes.json();
         if (!stripeRes.ok) {
           return new Response(JSON.stringify({ error: data.error?.message || "Stripe lookup failed" }), {
             status: stripeRes.status, headers: { "Content-Type": "application/json", ...corsHeaders }
           });
         }
+
         return new Response(JSON.stringify({
           paymentIntentId: data.id,
           status: data.status,
@@ -96,7 +101,6 @@ export default {
         const amount = parseFloat(body.amount);
         const description = body.description || "Amy Wireless Care+ Policy";
         const currency = (body.currency || "cad").toLowerCase();
-        const receiptEmail = body.receipt_email || undefined;
 
         if (isNaN(amount) || amount < 0.50) {
           return new Response(JSON.stringify({ error: "Amount must be at least $0.50 CAD" }), {
@@ -104,13 +108,14 @@ export default {
           });
         }
 
+        const amountInCents = Math.round(amount * 100);
+
         const params = new URLSearchParams({
-          amount: Math.round(amount * 100).toString(),
+          amount: amountInCents.toString(),
           currency: currency,
           description: description,
         });
         params.append("automatic_payment_methods[enabled]", "true");
-        if (receiptEmail) params.append("receipt_email", receiptEmail);
 
         const stripeResponse = await fetch("https://api.stripe.com/v1/payment_intents", {
           method: "POST",
@@ -120,12 +125,15 @@ export default {
           },
           body: params,
         });
+
         const stripeData = await stripeResponse.json();
+
         if (!stripeResponse.ok) {
           return new Response(JSON.stringify({
             error: stripeData.error?.message || "Stripe API rejected creation"
           }), { status: stripeResponse.status, headers: { "Content-Type": "application/json", ...corsHeaders } });
         }
+
         return new Response(JSON.stringify({
           paymentIntentId: stripeData.id,
           clientSecret: stripeData.client_secret,
