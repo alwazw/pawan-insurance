@@ -12,7 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
+  <script src="https://js.stripe.com/v3/"></script>  
+  
   <script>
     tailwind.config = {
       theme: {
@@ -756,6 +757,15 @@
           </span>
         </div>
 
+        <!-- Stripe Payment Element (v2) -->
+        <div id="stripePaymentElementContainer" class="hidden space-y-3">
+          <div id="payment-element" class="p-3 rounded-xl bg-white border border-slate-200 min-h-[44px]"></div>
+          <button type="button" onclick="submitStripePayment()" class="w-full py-3 bg-[#635BFF] hover:bg-[#4a50d6] text-white rounded-xl text-sm font-bold transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-lock"></i><span>Pay Now</span>
+          </button>
+        </div>
+
+
         <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center gap-4">
           <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-[#635BFF] shrink-0" id="stripeSpinnerIcon">
             <i class="fa-solid fa-circle-notch animate-spin text-xl"></i>
@@ -805,6 +815,12 @@
           </label>
           <input type="url" id="workerUrlInput" placeholder="https://amy-stripe-api.yourusername.workers.dev" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
           <p class="text-[10px] text-slate-500 mt-1">Saved locally on this device. Never commits your secret keys to HTML.</p>
+        </div>
+
+        <div class="pt-1">
+          <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-1.5">Stripe Publishable Key (pk_…)</label>
+          <input type="text" id="stripePkInput" placeholder="pk_test_..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
+          <p class="text-[10px] text-slate-500 mt-1">From Stripe Dashboard → Developers → API keys. Safe to expose in the browser.</p>
         </div>
 
         <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
