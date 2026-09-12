@@ -146,7 +146,46 @@ export default {
       }
     }
 
-    return new Response(JSON.stringify({ error: "Route not found. Use POST /create or GET /check?id=" }), {
+    if (path === "/cancel" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const intentId = body.payment_intent_id;
+        if (!intentId || !intentId.startsWith("pi_")) {
+          return new Response(JSON.stringify({ error: "Missing or invalid payment_intent_id" }), {
+            status: 400, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        const cancelRes = await fetch(
+          `https://api.stripe.com/v1/payment_intents/${encodeURIComponent(intentId)}/cancel`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${env.STRIPE_SECRET_KEY}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        const cancelData = await cancelRes.json();
+
+        if (!cancelRes.ok) {
+          return new Response(JSON.stringify({ error: cancelData.error?.message || "Stripe cancel failed" }), {
+            status: cancelRes.status, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          paymentIntentId: cancelData.id,
+          status: cancelData.status
+        }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500, headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ error: "Route not found. Use POST /create, POST /cancel, or GET /check?id=" }), {
       status: 404, headers: { "Content-Type": "application/json", ...corsHeaders }
     });
   }

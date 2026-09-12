@@ -1377,6 +1377,7 @@
 
     function finishPaymentSuccess() {
       if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      sessionStorage.removeItem('amy_pending_policy');
       document.getElementById('stripeGatewayModal').classList.add('hidden');
       const cb = pendingTransaction && pendingTransaction.callback;
       resetStripeState();
@@ -1393,6 +1394,11 @@
         try {
           pollCount++;
           document.getElementById('stripePollCounter').textContent = `Poll #${pollCount}`;
+          if (pollCount > 20) {
+            clearInterval(pollingInterval); pollingInterval = null;
+            cancelPayment('Payment timed out waiting for Stripe confirmation. Check Stripe Dashboard for status.');
+            return;
+          }
           const res = await fetch(`${workerUrl}/check?id=${encodeURIComponent(intentId)}`, { method: "GET" });
           if (!res.ok) { console.warn(`Poll returned HTTP ${res.status}`); return; }
           const checkData = await res.json();
@@ -1412,12 +1418,22 @@
 
     function cancelPayment(reason = "Transaction cancelled by operator.") {
       if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      if (currentPaymentIntentId) {
+        const workerUrl = getWorkerUrl();
+        fetch(`${workerUrl}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ payment_intent_id: currentPaymentIntentId })
+        }).catch(function(e) { console.warn("Cancel call failed:", e); });
+      }
       resetStripeState();
+      sessionStorage.removeItem('amy_pending_policy');
       document.getElementById('stripeGatewayModal').classList.add('hidden');
       showToast(reason, 'error');
     }
 
     function resetStripeState() {
+      if (stripeElements) { try { stripeElements.destroy(); } catch(e) {} }
       stripeElements = null;
       stripeInstance = null;
       currentPaymentIntentId = null;
@@ -1508,6 +1524,9 @@
         paymentSchedule: paymentSchedule,
         claims: []
       };
+
+      // Persist policy data in sessionStorage so it survives a 3D Secure redirect
+      sessionStorage.setItem('amy_pending_policy', JSON.stringify(newPolData));
 
       document.getElementById('stripeTxType').textContent = paymentSchedule === 'upfront' ? 'Policy Premium (Upfront)' : 'Policy Premium (Month 1)';
       initiateRealStripePayment(
@@ -1934,6 +1953,48 @@
 
     function closeCertificate() { document.getElementById('policyCertificateModal').classList.add('hidden'); }
 
+    // ---- Stripe redirect-return handler (3D Secure / SCA) ----
+    (function handleStripeReturn() {
+      const url = new URL(window.location.href);
+      const clientSecret = url.searchParams.get('payment_intent_client_secret');
+      const redirectStatus = url.searchParams.get('redirect_status');
+      if (!clientSecret || !redirectStatus) return;
+
+      // Clean query params from the URL so refresh doesn't re-trigger
+      url.searchParams.delete('payment_intent');
+      url.searchParams.delete('payment_intent_client_secret');
+      url.searchParams.delete('redirect_status');
+      history.replaceState(null, '', url.toString());
+
+      const pk = localStorage.getItem('amy_stripe_pk');
+      if (!pk) {
+        console.error('No Stripe publishable key found for redirect handling.');
+        return;
+      }
+
+      const recheckStripe = Stripe(pk);
+      recheckStripe.retrievePaymentIntent(clientSecret).then(function(result) {
+        if (result.error) {
+          alert('Payment verification failed: ' + result.error.message);
+          sessionStorage.removeItem('amy_pending_policy');
+          return;
+        }
+        var pi = result.paymentIntent;
+        if (pi && pi.status === 'succeeded') {
+          var pendingJson = sessionStorage.getItem('amy_pending_policy');
+          if (pendingJson) {
+            sessionStorage.removeItem('amy_pending_policy');
+            window._redirectPolicyData = JSON.parse(pendingJson);
+          }
+        } else if (pi) {
+          alert('Payment ' + redirectStatus + ' (status: ' + pi.status + ').');
+          sessionStorage.removeItem('amy_pending_policy');
+        }
+      }).catch(function(err) {
+        console.error('retrievePaymentIntent error:', err);
+      });
+    })();
+
     window.onload = () => {
       initDates();
       populateDropdowns();
@@ -1942,6 +2003,10 @@
       renderLedgerTable();
       renderClaimsLedger();
       renderAnalytics();
+      if (window._redirectPolicyData) {
+        finalizePolicyIssuance(window._redirectPolicyData);
+        delete window._redirectPolicyData;
+      }
     };
   </script>
 </body>
