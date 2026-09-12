@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amy Wireless — Care+ Device Protection & Extended Warranty Studio</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            amy: {
+              orange: '#F58220',
+              'orange-hover': '#E06F0F',
+              blue: '#005BAC',
+              'blue-hover': '#004C91',
+              dark: '#0B111E',
+              card: '#111927',
+              border: '#1E293B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @media print {
+      body * { visibility: hidden !important; }
+      #policyCertificateModal, #policyCertificateModal * { visibility: visible !important; }
+      #policyCertificateModal {
+        position: absolute; left: 0; top: 0; right: 0;
+        background: white !important; color: #0f172a !important;
+        padding: 0 !important; margin: 0 !important; box-shadow: none !important;
+        overflow: visible !important; height: auto !important;
+      }
+      .no-print { display: none !important; }
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0B111E; }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    @keyframes slideInUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .toast-enter { animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; margin: 0; 
+    }
+  </style>
+
+  <script>
+    function switchTab(tabName, query = '') {
+      const views = ['pos', 'claims', 'underwriting', 'ledger', 'analytics'];
+      views.forEach(v => {
+        const viewEl = document.getElementById(`view-${v}`);
+        if (viewEl) viewEl.classList.toggle('hidden', v !== tabName);
+
+        const btn = document.getElementById(`tab-btn-${v}`);
+        if (btn) {
+          if (v === tabName) {
+            btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#005BAC] text-white shadow-sm transition flex items-center space-x-2";
+          } else {
+            btn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center space-x-2";
+          }
+        }
+
+        const mobBtn = document.getElementById(`mob-btn-${v}`);
+        if (mobBtn) {
+          const span = mobBtn.querySelector('span');
+          if (v === tabName) {
+            mobBtn.className = "flex flex-col items-center gap-1 text-[#005BAC] transition flex-1";
+            if (span) { span.classList.add('font-bold'); span.classList.remove('font-semibold'); }
+          } else {
+            mobBtn.className = "flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition flex-1";
+            if (span) { span.classList.add('font-semibold'); span.classList.remove('font-bold'); }
+          }
+        }
+      });
+
+      try {
+        if (tabName === 'underwriting' && typeof window.renderUnderwritingGrid === 'function') window.renderUnderwritingGrid();
+        if (tabName === 'ledger' && typeof window.renderLedgerTable === 'function') {
+          const searchInput = document.getElementById('ledgerSearchInput');
+          if (searchInput && query) searchInput.value = query;
+          window.renderLedgerTable();
+        }
+        if (tabName === 'claims' && typeof window.renderClaimsLedger === 'function') {
+          if (query) {
+            const claimInput = document.getElementById('claimLookupId');
+            if (claimInput) claimInput.value = query;
+            if (typeof window.lookupPolicyForClaim === 'function') window.lookupPolicyForClaim();
+          }
+          window.renderClaimsLedger();
+        }
+        if (tabName === 'analytics' && typeof window.renderAnalytics === 'function') window.renderAnalytics();
+      } catch (e) {
+        console.warn("Error during switchTab:", e);
+      }
+    }
+    window.switchTab = switchTab;
+  </script>
+</head>
+
+<body class="bg-[#0B111E] text-slate-100 font-sans min-h-screen antialiased selection:bg-[#F58220] selection:text-white pb-24 lg:pb-10">
+
+  <header class="sticky top-0 z-40 bg-[#0B111E]/95 backdrop-blur-md border-b border-slate-800/80 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo Section -->
+      <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="switchTab('pos')">
+        <div class="flex items-center space-x-2.5">
+          <div class="relative h-10 w-auto rounded bg-white p-1 shadow-md flex items-center justify-center overflow-hidden">
+             <img src="amy-wireless-logo.png" alt="Amy Wireless" class="h-full w-auto object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+             <div class="hidden h-full items-center">
+                <svg viewBox="0 0 100 100" class="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="50" cy="22" r="3" fill="#005BAC"/>
+                  <path d="M38 29 C44 23, 56 23, 62 29" stroke="#005BAC" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M32 35 C42 27, 58 27, 68 35" stroke="#005BAC" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="28" cy="38" r="3" fill="#F58220"/>
+                  <path d="M28 41 L28 58" stroke="#F58220" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M22 72 L45 42 L68 72 M33 60 L62 60" stroke="#F58220" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M68 50 L68 62" stroke="#F58220" stroke-width="6" stroke-linecap="round"/>
+                  <path d="M22 66 C16 80, 50 92, 78 78 C90 70, 92 56, 80 48 C70 42, 60 48, 58 52" stroke="#005BAC" stroke-width="3.5" stroke-linecap="round"/>
+                </svg>
+             </div>
+          </div>
+          <div class="leading-tight">
+            <div class="flex items-center space-x-1.5">
+              <span class="font-black text-base sm:text-lg tracking-tight text-white">AMY <span class="text-[#005BAC]">WIRELESS</span></span>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-[#F58220]/20 text-[#F58220] font-bold border border-[#F58220]/30 tracking-wider">CARE+</span>
+            </div>
+            <div class="flex items-center space-x-2 text-[10px] text-slate-400">
+              <span>amywireless.ca</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop Navigation Tabs -->
+      <nav class="hidden lg:flex items-center space-x-1 bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+        <button id="tab-btn-pos" onclick="switchTab('pos')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#005BAC] text-white shadow-sm transition flex items-center space-x-2">
+          <i class="fa-solid fa-cash-register"></i><span>Issue Policy</span>
+        </button>
+        <button id="tab-btn-claims" onclick="switchTab('claims')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center space-x-2">
+          <i class="fa-solid fa-truck-medical"></i><span>Claims</span>
+        </button>
+        <button id="tab-btn-underwriting" onclick="switchTab('underwriting')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center space-x-2">
+          <i class="fa-solid fa-calculator"></i><span>Devices Covered & Rates</span>
+        </button>
+        <button id="tab-btn-ledger" onclick="switchTab('ledger')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center space-x-2">
+          <i class="fa-solid fa-book"></i><span>All Policies</span>
+        </button>
+        <button id="tab-btn-analytics" onclick="switchTab('analytics')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition flex items-center space-x-2">
+          <i class="fa-solid fa-chart-pie"></i><span>Stats</span>
+        </button>
+      </nav>
+
+      <!-- Sync Status -->
+      <div class="flex items-center space-x-3">
+        <button type="button" onclick="openGatewaySettingsModal()" class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[11px] font-mono transition">
+          <i class="fa-solid fa-gear text-[10px]"></i>
+          <span class="hidden sm:inline">Stripe Gateway Config</span>
+        </button>
+        <span class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-mono">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="hidden sm:inline">Live Sync</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Top Navigation -->
+  <div class="lg:hidden bg-[#0B111E] border-b border-slate-800 overflow-x-auto whitespace-nowrap hide-scrollbar flex items-center p-2 space-x-2">
+    <button onclick="switchTab('pos')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-white">Issue Policy</button>
+    <button onclick="switchTab('claims')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-slate-400 hover:text-white">Claims</button>
+    <button onclick="switchTab('underwriting')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-slate-400 hover:text-white">Devices Covered & Rates</button>
+    <button onclick="switchTab('ledger')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-slate-400 hover:text-white">All Policies</button>
+    <button onclick="switchTab('analytics')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-slate-400 hover:text-white">Stats</button>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- VIEW 1: POS QUOTER & POLICY ISSUANCE -->
+    <section id="view-pos" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Left Column: POS Form -->
+      <div class="lg:col-span-7 bg-[#111927] border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <span class="w-2 h-5 rounded bg-[#F58220]"></span>
+              <span>Issue Care+ Policy</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Generate customized device protection plans.</p>
+          </div>
+          <button type="button" onclick="loadSampleCustomer()" class="text-[11px] text-[#F58220] hover:text-[#E06F0F] font-mono underline transition">
+            Auto-Fill Sample
+          </button>
+        </div>
+
+        <form id="posForm" onsubmit="handleIssuePolicy(event)" class="space-y-6">
+          
+          <!-- 1. Customer Information -->
+          <div>
+            <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">1. Customer Information</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="text" id="custName" required placeholder="Full Name *" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              <input type="email" id="custEmail" required placeholder="Email Address *" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              <input type="text" id="custPhone" placeholder="Mobile Phone: (XXX) XXX-XXXX" maxlength="14" class="sm:col-span-2 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
+            </div>
+            <!-- Expanded Address Fields -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-800/80">
+              <input type="text" id="custAddress1" placeholder="Address Line 1" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              <input type="text" id="custAddress2" placeholder="Address Line 2 (Apt, Suite, etc.)" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              <input type="text" id="custCity" placeholder="City" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              <div class="grid grid-cols-2 gap-3">
+                <input type="text" id="custProvince" placeholder="Province (e.g. ON)" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+                <input type="text" id="custPostal" placeholder="Postal Code" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC] uppercase">
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Coverage Period -->
+          <div>
+            <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">2. Coverage Period</label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <span class="text-[10px] text-slate-500 mb-1 block">Issue Date</span>
+                <input type="date" id="issueDate" required onchange="updateExpiryDate()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC]">
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 mb-1 block">Expiry Date (Auto-calculated)</span>
+                <input type="date" id="expiryDate" disabled class="w-full bg-slate-800/50 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-400 focus:outline-none cursor-not-allowed">
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Device Identification -->
+          <div>
+            <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">3. Device Identification</label>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Device Type</span>
+                <select id="deviceTypeSelect" onchange="handleDeviceTypeChange()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#005BAC]"></select>
+              </div>
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Brand</span>
+                <select id="deviceBrandSelect" onchange="handleDeviceBrandChange()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#005BAC]"></select>
+              </div>
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Model</span>
+                <select id="deviceModelSelect" onchange="recalculateQuote()" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#005BAC]"></select>
+              </div>
+            </div>
+            
+            <!-- Laptop Extended Fields -->
+            <div id="laptopSpecsContainer" class="hidden grid-cols-1 sm:grid-cols-3 gap-3 mb-3 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Screen</span>
+                <select id="laptopScreen" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                  <option value="Regular">Regular</option>
+                  <option value="Touch Screen">Touch Screen</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">RAM</span>
+                <select id="laptopRam" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                  <option value="8GB">8GB</option><option value="12GB">12GB</option><option value="16GB">16GB</option>
+                  <option value="24GB">24GB</option><option value="32GB">32GB</option><option value="48GB">48GB</option><option value="64GB">64GB</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Storage</span>
+                <select id="laptopStorage" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+                  <option value="256GB">256GB</option><option value="512GB">512GB</option><option value="1TB">1TB</option>
+                  <option value="2TB">2TB</option><option value="4TB">4TB</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3">
+              <input type="text" id="deviceSerial" required placeholder="IMEI / Device Serial *" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
+              <textarea id="deviceDesc" rows="2" placeholder="Device Description (Optional: Color, condition, pre-existing issues...)" class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#005BAC] resize-none"></textarea>
+            </div>
+          </div>
+
+          <!-- 4. Modular Coverage Scope -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold">4. Modular Coverage Scope</label>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" id="coverageCheckboxesContainer">
+              <label class="flex items-start space-x-3 p-3 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-[#005BAC] transition relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-slate-800 text-[9px] font-bold text-slate-400 px-2 py-0.5 rounded-bl-lg border-b border-l border-slate-700">Count: 1</div>
+                <input type="checkbox" id="cov_screen" checked onchange="recalculateQuote()" class="mt-0.5 rounded text-[#005BAC] focus:ring-0 bg-slate-800 border-slate-700 w-4 h-4">
+                <div class="flex-1 text-xs pr-10">
+                  <div class="font-semibold text-white">Display & Glass Replacement</div>
+                  <div class="grid grid-cols-3 gap-1 mt-1.5 text-[9px] uppercase font-mono">
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Max Cov.</span><span id="cov_max_screen" class="text-white font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Premium</span><span id="cov_prem_screen" class="text-[#005BAC] font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Deductible</span><span id="cov_ded_screen" class="text-[#F58220] font-bold">$0</span></div>
+                  </div>
+                </div>
+              </label>
+
+              <label class="flex items-start space-x-3 p-3 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-[#005BAC] transition relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-slate-800 text-[9px] font-bold text-slate-400 px-2 py-0.5 rounded-bl-lg border-b border-l border-slate-700">Count: 1</div>
+                <input type="checkbox" id="cov_battery" checked onchange="recalculateQuote()" class="mt-0.5 rounded text-[#005BAC] focus:ring-0 bg-slate-800 border-slate-700 w-4 h-4">
+                <div class="flex-1 text-xs pr-10">
+                  <div class="font-semibold text-white">Battery Replacement</div>
+                  <div class="grid grid-cols-3 gap-1 mt-1.5 text-[9px] uppercase font-mono">
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Max Cov.</span><span id="cov_max_battery" class="text-white font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Premium</span><span id="cov_prem_battery" class="text-[#005BAC] font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Deductible</span><span id="cov_ded_battery" class="text-[#F58220] font-bold">$0</span></div>
+                  </div>
+                </div>
+              </label>
+
+              <label class="flex items-start space-x-3 p-3 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-[#005BAC] transition relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-slate-800 text-[9px] font-bold text-slate-400 px-2 py-0.5 rounded-bl-lg border-b border-l border-slate-700">Count: 1</div>
+                <input type="checkbox" id="cov_board" checked onchange="recalculateQuote()" class="mt-0.5 rounded text-[#005BAC] focus:ring-0 bg-slate-800 border-slate-700 w-4 h-4">
+                <div class="flex-1 text-xs pr-10">
+                  <div class="font-semibold text-white">Motherboard</div>
+                  <div class="grid grid-cols-3 gap-1 mt-1.5 text-[9px] uppercase font-mono">
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Max Cov.</span><span id="cov_max_board" class="text-white font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Premium</span><span id="cov_prem_board" class="text-[#005BAC] font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Deductible</span><span id="cov_ded_board" class="text-[#F58220] font-bold">$0</span></div>
+                  </div>
+                </div>
+              </label>
+
+              <label class="flex items-start space-x-3 p-3 rounded-xl bg-slate-900 border border-slate-800 cursor-pointer hover:border-[#005BAC] transition relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-slate-800 text-[9px] font-bold text-slate-400 px-2 py-0.5 rounded-bl-lg border-b border-l border-slate-700">Count: 1</div>
+                <input type="checkbox" id="cov_case" checked onchange="recalculateQuote()" class="mt-0.5 rounded text-[#005BAC] focus:ring-0 bg-slate-800 border-slate-700 w-4 h-4">
+                <div class="flex-1 text-xs pr-10">
+                  <div class="font-semibold text-white">Chassis Replacement</div>
+                  <div class="grid grid-cols-3 gap-1 mt-1.5 text-[9px] uppercase font-mono">
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Max Cov.</span><span id="cov_max_case" class="text-white font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Premium</span><span id="cov_prem_case" class="text-[#005BAC] font-bold">$0</span></div>
+                    <div><span class="text-slate-500 block mb-0.5 font-bold">Deductible</span><span id="cov_ded_case" class="text-[#F58220] font-bold">$0</span></div>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- 5 & 6. Term & Billing Switch -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">5. Term</label>
+              <select id="warrantyTerm" onchange="updateExpiryDate(); recalculateQuote();" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none">
+                <option value="3">3 Months (Short)</option>
+                <option value="6">6 Months (Half Year)</option>
+                <option value="12" selected>12 Months (Standard)</option>
+                <option value="24">24 Months (Comprehensive)</option>
+                <option value="36">36 Months (Extended)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">6. Billing</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="payTypeUpfront" onclick="setPaymentSchedule('upfront')" class="py-2.5 px-3 rounded-xl text-xs font-bold border border-[#F58220] bg-[#F58220] text-white transition shadow-lg shadow-[#F58220]/20">Upfront (Save 10%)</button>
+                <button type="button" id="payTypeMonthly" onclick="setPaymentSchedule('monthly')" class="py-2.5 px-3 rounded-xl text-xs font-bold border border-[#005BAC] bg-[#005BAC] text-white transition opacity-60 hover:opacity-100">Monthly</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Action -->
+          <div class="pt-2">
+            <button type="submit" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-stamp text-base"></i><span>Create & Issue Care+ Policy</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Right Column: Live Actuarial Quoter -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="bg-[#111927] border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl sticky top-24 space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+              <div class="w-2.5 h-2.5 rounded-full bg-[#F58220] animate-pulse"></div> Live Quote
+            </h3>
+            <span id="pricingTierBadge" class="text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full bg-[#005BAC]/20 text-sky-400 font-bold border border-[#005BAC]/30">Smartphone</span>
+          </div>
+
+          <div class="space-y-2.5 text-xs text-slate-300" id="quoteLineItems"></div>
+          
+          <!-- Coupon Entry Container -->
+          <div class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800" id="couponEntryContainer">
+            <input type="text" id="couponCode" oninput="recalculateQuote()" placeholder="Coupon (e.g. BF20)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-bold focus:outline-none flex-1 uppercase">
+            <div class="relative w-1/3">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 font-mono text-xs font-bold">-$</span>
+              <input type="number" id="couponValue" oninput="recalculateQuote()" placeholder="0.00" class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-2 text-xs text-rose-500 font-bold focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Normalized Financial Display Box -->
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between shadow-inner mt-3 space-y-3">
+            <div class="flex justify-between items-center text-xs text-slate-400">
+              <span id="priceLabel" class="font-bold uppercase tracking-wider">Total Premium</span>
+              <span id="priceTermBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">12-Month Plan</span>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2">
+              <div class="text-3xl font-black text-white font-mono" id="displayTotalPremium">$0.00</div>
+              <div id="discountIndicator" class="text-[11px] font-mono font-bold text-right flex flex-col items-start sm:items-end leading-tight"></div>
+            </div>
+            
+            <!-- Manual Override -->
+            <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+              <span class="text-[10px] text-slate-400 uppercase font-mono font-bold">Manual Premium Override</span>
+              <div class="relative w-28">
+                <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono">$</span>
+                <input type="number" id="manualPremiumOverride" oninput="applyManualPremium()" placeholder="Auto" class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-6 pr-2 py-1.5 text-xs text-white font-mono focus:border-[#F58220] focus:outline-none">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: CLAIMS PROCESSING & LIFECYCLE -->
+    <section id="view-claims" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Claim Intake Form -->
+        <div class="lg:col-span-1 bg-[#111927] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
+          <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+            <i class="fa-solid fa-truck-medical text-[#F58220]"></i> Record Incident / Claim
+          </h2>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-[11px] font-mono uppercase text-slate-400 mb-1.5 font-bold">Lookup Active Policy</label>
+              <div class="flex space-x-2">
+                <input type="text" list="policySearchList" id="claimLookupId" oninput="lookupPolicyForClaim()" placeholder="e.g. AMY-2026-... or Customer Name" class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white font-mono uppercase">
+                <datalist id="policySearchList"></datalist>
+                <button type="button" onclick="lookupPolicyForClaim()" class="bg-[#005BAC] text-white px-3 py-2 rounded-lg text-xs font-bold"><i class="fa-solid fa-search"></i></button>
+              </div>
+            </div>
+
+            <div id="claimActivePolicyCard" class="hidden p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+              <div class="font-bold text-emerald-400 flex justify-between">
+                <span id="claimPolCustomer">--</span>
+                <i class="fa-solid fa-check-circle"></i>
+              </div>
+              <div class="text-[10px] text-slate-300 font-mono mt-1" id="claimPolDevice">--</div>
+              <div class="text-[10px] text-slate-400 mt-1">Covered: <span id="claimPolScope" class="font-bold text-white"></span></div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-mono uppercase text-slate-400 mb-1.5 font-bold">Select Incident Component</label>
+              <select id="claimComponent" disabled class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white disabled:opacity-50 transition">
+                <option value="">-- Lookup Policy First --</option>
+              </select>
+            </div>
+            
+            <button onclick="processClaim()" class="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-wrench"></i><span>Authorize Claim & Bill Deductible</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Claims Ledger -->
+        <div class="lg:col-span-2 bg-[#111927] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h2 class="text-base font-bold text-white font-mono">Recent Claim Activity</h2>
+            <span class="text-xs text-slate-400 font-mono" id="totalClaimsCounter">0 Total Claims</span>
+          </div>
+          
+          <div class="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/50">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-900 text-slate-400 font-mono text-[10px] uppercase">
+                <tr>
+                  <th class="p-3">Claim ID / Date</th>
+                  <th class="p-3">Policy & Customer</th>
+                  <th class="p-3">Repair Component</th>
+                  <th class="p-3 text-right">Deductible Paid</th>
+                  <th class="p-3 text-right">Part Cost</th>
+                  <th class="p-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody id="claimsLedgerBody" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: UNDERWRITING MATRIX -->
+    <section id="view-underwriting" class="hidden space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+        <div>
+          <h2 class="text-base font-bold text-white">Devices Covered & Rates</h2>
+          <p class="text-xs text-slate-400">Base repair costs dictate maximum coverage, premiums, and deductibles.</p>
+        </div>
+        <button onclick="openCreateSkuModal('manual')" class="px-3.5 py-2 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-xl text-xs font-bold transition flex items-center space-x-2 shadow-lg shadow-[#005BAC]/20">
+          <i class="fa-solid fa-plus"></i><span>Create New SKU</span>
+        </button>
+      </div>
+      <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-[#111927]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-900 text-slate-400 font-mono text-[10px] uppercase">
+            <tr>
+              <th class="p-3 pl-4">Hardware SKU</th>
+              <th class="p-3 text-right">Screen Cost</th>
+              <th class="p-3 text-right">Battery Cost</th>
+              <th class="p-3 text-right">Board Cost</th>
+              <th class="p-3 text-right">Chassis Cost</th>
+              <th class="p-3 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="underwritingTableBody" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 4: POLICY LEDGER & ISSUED WARRANTIES -->
+    <section id="view-ledger" class="hidden space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#111927] p-4 rounded-2xl border border-slate-800">
+        <div class="flex items-center space-x-2 flex-1 relative">
+          <i class="fa-solid fa-search absolute left-3 text-slate-500 text-xs"></i>
+          <input type="text" id="ledgerSearchInput" oninput="renderLedgerTable()" placeholder="Search Name, Policy ID, IMEI (Tip: type 'has:claims')..." class="w-full sm:w-96 bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3.5 py-2 text-xs text-white focus:outline-none">
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="renderLedgerTable()" class="px-3 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs transition"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-2xl border border-slate-800 bg-[#111927] shadow-xl">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-900 text-slate-400 font-mono text-[10px] uppercase tracking-wider">
+            <tr>
+              <th class="p-3 pl-4">Policy / Dates</th>
+              <th class="p-3">Customer Info</th>
+              <th class="p-3">Device & Details</th>
+              <th class="p-3 text-center">Claims</th>
+              <th class="p-3 text-right">Premium</th>
+              <th class="p-3 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerTableBody" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW 5: FINANCIALS & ANALYTICS DASHBOARD -->
+    <section id="view-analytics" class="hidden space-y-6">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-[#111927] border border-slate-800 p-5 rounded-2xl shadow flex flex-col justify-between hover:border-[#005BAC] cursor-pointer transition" onclick="switchTab('ledger')">
+          <div class="text-[11px] font-mono text-slate-400 uppercase font-bold">Gross Premiums</div>
+          <div class="text-2xl font-black text-white mt-2" id="kpiGrossPremium">$0.00</div>
+        </div>
+        <div class="bg-[#111927] border border-slate-800 p-5 rounded-2xl shadow flex flex-col justify-between hover:border-rose-500 cursor-pointer transition" onclick="switchTab('claims')">
+          <div class="text-[11px] font-mono text-slate-400 uppercase font-bold">Total Repair Costs</div>
+          <div class="text-2xl font-black text-rose-500 mt-2" id="kpiTotalCosts">$0.00</div>
+        </div>
+        <div class="bg-[#111927] border border-slate-800 p-5 rounded-2xl shadow flex flex-col justify-between">
+          <div class="text-[11px] font-mono text-slate-400 uppercase font-bold">Deductibles Collected</div>
+          <div class="text-2xl font-black text-emerald-400 mt-2" id="kpiDeductibles">$0.00</div>
+        </div>
+        <div class="bg-gradient-to-br from-[#0B111E] to-[#111927] border border-slate-700 p-5 rounded-2xl shadow flex flex-col justify-between relative overflow-hidden cursor-pointer" onclick="switchTab('ledger', 'has:claims')">
+          <div class="absolute right-0 top-0 opacity-10 text-[#F58220]"><i class="fa-solid fa-chart-pie text-6xl"></i></div>
+          <div class="text-[11px] font-mono text-slate-300 uppercase font-bold z-10">Net Loss Ratio</div>
+          <div class="flex items-baseline gap-2 mt-2 z-10">
+            <span class="text-3xl font-black text-white" id="kpiLossRatio">0%</span>
+            <span class="text-[10px] text-slate-400 font-mono">(Target &lt; 60%)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-[#111927] border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-file-invoice-dollar text-[#005BAC]"></i>
+              <span>Consolidated Financial Statement &amp; Margin Analysis</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Comprehensive cashflow summary across all Care+ warranty contracts.</p>
+          </div>
+          <span class="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 font-bold">Audited</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2">
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">Gross Inflow (Premiums)</span>
+            <span id="acctRevenue" class="text-xl font-black text-white font-mono">$0.00</span>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">Claims Inflow (Deductibles)</span>
+            <span id="acctDeduct" class="text-xl font-black text-emerald-400 font-mono">$0.00</span>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span class="text-[10px] font-mono uppercase font-bold text-slate-400 block mb-1">Repair Outflow (Parts Cost)</span>
+            <span id="acctParts" class="text-xl font-black text-rose-400 font-mono">-$0.00</span>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-[#005BAC]/40 bg-[#005BAC]/5">
+            <span class="text-[10px] font-mono uppercase font-bold text-sky-400 block mb-1">Net Cashflow / Underwriting Profit</span>
+            <span id="acctNet" class="text-xl font-black text-sky-300 font-mono">$0.00</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- POLICY CERTIFICATE MODAL -->
+  <div id="policyCertificateModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div class="bg-white text-slate-900 rounded-2xl w-full max-w-2xl shadow-2xl p-6 sm:p-8 space-y-6 my-auto relative">
+      <div class="no-print flex justify-between items-center border-b border-slate-200 pb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Official Certificate Preview</span>
+        <div class="flex items-center space-x-2">
+          <button type="button" onclick="window.print()" class="px-3 py-1.5 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-print"></i><span>Print Certificate</span>
+          </button>
+          <button type="button" onclick="closeCertificate()" class="p-1.5 text-slate-400 hover:text-slate-700 transition">
+            <i class="fa-solid fa-xmark text-base"></i>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Printable Certificate Body -->
+      <div class="space-y-4">
+        <div class="flex justify-between items-start border-b-2 border-[#005BAC] pb-4">
+          <div class="flex items-center space-x-3">
+             <div class="w-10 h-10 rounded bg-[#005BAC]/10 p-1 flex items-center justify-center">
+              <svg viewBox="0 0 100 100" class="w-8 h-8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="22" r="3" fill="#005BAC"/>
+                <path d="M38 29 C44 23, 56 23, 62 29" stroke="#005BAC" stroke-width="3" stroke-linecap="round"/>
+                <path d="M32 35 C42 27, 58 27, 68 35" stroke="#005BAC" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="28" cy="38" r="3" fill="#F58220"/>
+                <path d="M28 41 L28 58" stroke="#F58220" stroke-width="3" stroke-linecap="round"/>
+                <path d="M22 72 L45 42 L68 72 M33 60 L62 60" stroke="#F58220" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M68 50 L68 62" stroke="#F58220" stroke-width="6" stroke-linecap="round"/>
+                <path d="M22 66 C16 80, 50 92, 78 78 C90 70, 92 56, 80 48 C70 42, 60 48, 58 52" stroke="#005BAC" stroke-width="3.5" stroke-linecap="round"/>
+              </svg>
+             </div>
+             <div>
+               <div class="text-xl font-black text-[#005BAC] tracking-tight">AMY WIRELESS <span class="text-[#F58220]">CARE+</span></div>
+               <div class="text-[10px] text-slate-500 font-semibold">68 Chesterwood Cres #2, Brampton, ON L6Y 0Z4 • amywireless.ca • (647) 642-2000</div>
+             </div>
+          </div>
+          <div class="text-right">
+            <div id="certPolicyId" class="text-lg font-bold font-mono text-slate-900">AMY-000</div>
+            <div id="certTermLength" class="text-xs font-bold text-[#005BAC]">12 Months Coverage</div>
+            <div class="text-[9px] text-slate-500 mt-1">Valid: <span id="certDates">--</span></div>
+          </div>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="grid grid-cols-2 gap-4 text-xs">
+          <div class="p-3 bg-slate-50 rounded border border-slate-200 relative">
+            <div class="text-[9px] uppercase font-bold text-slate-400">Policyholder</div>
+            <div id="certCustName" class="font-bold text-sm text-slate-900 mt-0.5">--</div>
+            <div id="certCustEmail" class="text-slate-600 mt-0.5">--</div>
+            <div id="certCustPhone" class="text-slate-600 font-mono text-[10px] mt-0.5">--</div>
+            <div id="certCustAddress" class="text-slate-500 text-[10px] leading-tight mt-1 pt-1 border-t border-slate-200">--</div>
+          </div>
+          <div class="p-3 bg-slate-50 rounded border border-slate-200">
+            <div class="text-[9px] uppercase font-bold text-slate-400">Covered Device</div>
+            <div id="certDeviceModel" class="font-bold text-sm text-[#005BAC]">--</div>
+            <div class="text-slate-600 font-mono mt-1">IMEI/ID: <span id="certDeviceSerial">--</span></div>
+            <div id="certDeviceDesc" class="text-[10px] text-slate-500 mt-1 italic"></div>
+          </div>
+        </div>
+
+        <!-- Covered Scope Schedule -->
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Authorized Coverage Schedule (1 Claim Per Insured Category Only)</div>
+          <table class="w-full text-xs text-left border-collapse border border-slate-200">
+            <thead class="bg-slate-100 text-slate-600">
+              <tr>
+                <th class="p-2">Component</th>
+                <th class="p-2 text-right">Max Coverage</th>
+                <th class="p-2 text-right">Deductible Required</th>
+              </tr>
+            </thead>
+            <tbody id="certCoverageList" class="divide-y divide-slate-100"></tbody>
+          </table>
+          <div id="certCouponRow" class="hidden flex justify-between items-center text-xs p-2 mt-2 border border-rose-200 bg-rose-50 rounded">
+            <span class="font-bold text-rose-600 uppercase" id="certCouponName">Discount Applied</span>
+            <span class="font-mono font-bold text-rose-600" id="certCouponAmt">-$0.00</span>
+          </div>
+        </div>
+
+        <!-- Claims History Module -->
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-500 mb-1">Claims & Utilization History</div>
+          <table class="w-full text-xs text-left border-collapse border border-slate-200">
+            <thead class="bg-[#0B111E] text-white">
+              <tr>
+                <th class="p-2">Date</th>
+                <th class="p-2">Claim ID</th>
+                <th class="p-2">Incident / Component</th>
+                <th class="p-2 text-right">Deductible Paid</th>
+              </tr>
+            </thead>
+            <tbody id="certClaimsList" class="divide-y divide-slate-200 bg-slate-50"></tbody>
+          </table>
+        </div>
+
+        <!-- Footer -->
+        <div class="flex justify-between items-center text-[10px] text-slate-500 pt-4 border-t border-slate-200 mt-4">
+          <div>Valid at Amy Wireless Brampton.<br><strong>Policy covers 1 claim per insured category only.</strong> Subject to Care+ Terms.</div>
+          <div class="font-bold text-slate-800 text-right">
+            Total Premium Paid: <br><span id="certPremiumTotal" class="text-[#F58220] text-sm font-black">$0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIVE STRIPE API MODAL -->
+  <div id="stripeGatewayModal" class="fixed inset-0 z-[110] bg-[#0B111E]/90 backdrop-blur-md hidden flex items-center justify-center p-4 transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative">
+      <div class="bg-[#635BFF] p-6 text-center text-white relative">
+        <div class="absolute top-4 right-4">
+          <button type="button" onclick="cancelPayment()" class="text-white/70 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <i class="fa-brands fa-stripe text-5xl mb-1"></i>
+        <h3 class="text-sm font-medium opacity-90 tracking-wide">Secure API Gateway</h3>
+      </div>
+      
+      <div class="p-6 sm:p-8 space-y-5">
+        <div class="text-center space-y-1">
+          <p class="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono" id="stripeTxType">Policy Premium</p>
+          <div class="text-4xl font-black text-slate-900 font-mono" id="stripeTxAmount">$0.00</div>
+          <p class="text-[11px] text-slate-500 font-semibold" id="stripeTxDesc">Preparing transaction...</p>
+        </div>
+
+        <!-- Live Payment Intent Tracker Badge -->
+        <div id="stripeIntentBadge" class="hidden text-center">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-mono select-all">
+            <i class="fa-solid fa-fingerprint text-[#635BFF]"></i>
+            <span id="stripeIntentIdText">pi_...</span>
+          </span>
+        </div>
+
+        <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 flex items-center gap-4">
+          <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-[#635BFF] shrink-0" id="stripeSpinnerIcon">
+            <i class="fa-solid fa-circle-notch animate-spin text-xl"></i>
+          </div>
+          <div class="text-xs text-slate-600 flex-1 leading-relaxed">
+            <span class="block font-bold text-slate-800" id="stripeStatusText">Connecting to Cloudflare API...</span>
+            <span id="stripeSubtext">Initializing secure transaction with Stripe...</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Error / Troubleshooting Panel inside Modal -->
+        <div id="stripeModalErrorBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs space-y-2">
+          <div class="flex items-center gap-1.5 font-bold">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Transaction Failed</span>
+          </div>
+          <p id="stripeModalErrorText" class="text-[11px] font-mono leading-tight break-all"></p>
+          <div class="pt-1 flex gap-2">
+            <button type="button" onclick="openGatewaySettingsModal()" class="px-2.5 py-1 bg-white border border-rose-300 hover:bg-rose-100 text-rose-800 rounded text-[10px] font-bold transition">Check Worker URL</button>
+            <button type="button" onclick="cancelPayment()" class="px-2.5 py-1 bg-rose-700 text-white rounded text-[10px] font-bold transition">Dismiss</button>
+          </div>
+        </div>
+        
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+          <span id="stripePollCounter">Attempt: 0</span>
+          <button type="button" onclick="cancelPayment()" class="text-slate-500 hover:text-rose-600 font-bold transition">Cancel Transaction</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GATEWAY SETTINGS & HEALTH CHECK MODAL -->
+  <div id="gatewaySettingsModal" class="fixed inset-0 z-[120] bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#111927] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden space-y-0">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+        <h3 class="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-brands fa-stripe text-[#635BFF] text-lg"></i>
+          <span>Cloudflare & Stripe Gateway Config</span>
+        </h3>
+        <button type="button" onclick="closeGatewaySettingsModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-1.5">
+            Cloudflare Worker URL
+          </label>
+          <input type="url" id="workerUrlInput" placeholder="https://amy-stripe-api.yourusername.workers.dev" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#005BAC]">
+          <p class="text-[10px] text-slate-500 mt-1">Saved locally on this device. Never commits your secret keys to HTML.</p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300">Live Health Diagnostic</span>
+            <button type="button" onclick="runWorkerHealthCheck()" class="px-3 py-1 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5">
+              <i class="fa-solid fa-stethoscope"></i>
+              <span>Test Connection</span>
+            </button>
+          </div>
+          <div id="healthCheckResult" class="text-xs font-mono p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 min-h-[50px] flex items-center">
+            Click "Test Connection" to verify Worker status, CORS, and Stripe Secret Key.
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex justify-end gap-2">
+          <button type="button" onclick="closeGatewaySettingsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">Cancel</button>
+          <button type="button" onclick="saveGatewaySettings()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-save"></i>
+            <span>Save URL</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE / EDIT SKU MODAL -->
+  <div id="createSkuModal" class="fixed inset-0 z-[80] bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#111927] border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+        <h3 id="createSkuModalTitle" class="text-sm font-bold text-white font-mono uppercase tracking-wider text-[#005BAC]">Add New Device to Rates</h3>
+        <button type="button" onclick="closeCreateSkuModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="newSkuForm" onsubmit="handleCreateSku(event)" class="p-5 space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] text-slate-400 font-mono mb-1">Device Type (Custom / Editable)</label>
+            <input type="text" id="newSkuType" list="skuTypeOptions" required placeholder="e.g. Smartphone" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+            <datalist id="skuTypeOptions">
+              <option value="Smartphone">
+              <option value="Laptop">
+              <option value="Tablet">
+            </datalist>
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 font-mono mb-1">Brand</label>
+            <input type="text" id="newSkuBrand" required placeholder="e.g. Apple" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+          </div>
+          <div class="col-span-2">
+            <label class="block text-[10px] text-slate-400 font-mono mb-1">Model Name</label>
+            <input type="text" id="newSkuModel" required placeholder="e.g. iPhone 17 Pro" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800">
+          <div><label class="block text-[10px] text-slate-400 font-mono mb-1">Screen Base Cost ($)</label><input type="number" id="newSkuScreen" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></div>
+          <div><label class="block text-[10px] text-slate-400 font-mono mb-1">Battery Base Cost ($)</label><input type="number" id="newSkuBattery" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></div>
+          <div><label class="block text-[10px] text-slate-400 font-mono mb-1">Motherboard Base Cost ($)</label><input type="number" id="newSkuBoard" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></div>
+          <div><label class="block text-[10px] text-slate-400 font-mono mb-1">Chassis Base Cost ($)</label><input type="number" id="newSkuCase" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></div>
+        </div>
+        <p class="text-[9px] text-slate-500 font-mono italic">Note: Max Coverage (3x), Premiums (60%), and Deductibles (20%) are calculated automatically based on these base costs.</p>
+        
+        <div class="pt-4 flex gap-3">
+          <button type="submit" id="createSkuModalBtn" class="flex-1 py-2.5 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-xl text-xs font-bold transition">Add to Rates Matrix</button>
+          <button type="button" onclick="closeCreateSkuModal()" class="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs transition">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Custom In-App Confirmation Modal -->
+  <div id="customConfirmModal" class="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#111927] border border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl p-5 space-y-4">
+      <div class="flex items-center space-x-3 text-rose-500">
+        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        <h3 id="confirmModalTitle" class="text-sm font-bold text-white font-mono">Confirm Action</h3>
+      </div>
+      <p id="confirmModalMessage" class="text-xs text-slate-300 leading-relaxed font-sans">Are you sure?</p>
+      <div class="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800">
+        <button type="button" onclick="closeConfirmModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition">Cancel</button>
+        <button type="button" id="confirmActionBtn" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed bottom-24 lg:bottom-10 right-4 lg:right-10 z-[200] flex flex-col gap-3 pointer-events-none"></div>
+
+  <!-- Mobile Bottom Navigation Dock -->
+  <nav class="lg:hidden fixed bottom-0 left-0 w-full bg-[#0B111E]/95 backdrop-blur-md border-t border-slate-800 z-[90] flex items-center justify-around px-2 py-3 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+    <button id="mob-btn-pos" onclick="switchTab('pos')" class="flex flex-col items-center gap-1 text-[#005BAC] transition flex-1">
+      <i class="fa-solid fa-cash-register text-lg"></i><span class="text-[10px] font-bold">Issue Policy</span>
+    </button>
+    <button id="mob-btn-claims" onclick="switchTab('claims')" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition flex-1">
+      <i class="fa-solid fa-truck-medical text-lg"></i><span class="text-[10px] font-semibold">Claims</span>
+    </button>
+    <button id="mob-btn-underwriting" onclick="switchTab('underwriting')" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition flex-1">
+      <i class="fa-solid fa-calculator text-lg"></i><span class="text-[10px] font-semibold truncate w-full text-center">Rates</span>
+    </button>
+    <button id="mob-btn-ledger" onclick="switchTab('ledger')" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition flex-1">
+      <i class="fa-solid fa-book text-lg"></i><span class="text-[10px] font-semibold truncate w-full text-center">Policies</span>
+    </button>
+    <button id="mob-btn-analytics" onclick="switchTab('analytics')" class="flex flex-col items-center gap-1 text-slate-500 hover:text-slate-300 transition flex-1">
+      <i class="fa-solid fa-chart-pie text-lg"></i><span class="text-[10px] font-semibold">Stats</span>
+    </button>
+  </nav>
+
+  <script>
+    const DEFAULT_WORKER_URL = "https://amy-stripe-api.yourusername.workers.dev";
+    
+    function getWorkerUrl() {
+      const stored = localStorage.getItem('amy_stripe_worker_url');
+      return (stored && stored.trim() !== '') ? stored.trim().replace(/\/$/, '') : DEFAULT_WORKER_URL;
+    }
+
+    function openGatewaySettingsModal() {
+      document.getElementById('workerUrlInput').value = getWorkerUrl();
+      document.getElementById('gatewaySettingsModal').classList.remove('hidden');
+    }
+
+    function closeGatewaySettingsModal() {
+      document.getElementById('gatewaySettingsModal').classList.add('hidden');
+    }
+
+    function saveGatewaySettings() {
+      const val = document.getElementById('workerUrlInput').value.trim().replace(/\/$/, '');
+      if (!val.startsWith('http://') && !val.startsWith('https://')) {
+        return showToast('Invalid URL. Must begin with https://', 'error');
+      }
+      localStorage.setItem('amy_stripe_worker_url', val);
+      showToast('Gateway URL saved successfully!', 'success');
+      closeGatewaySettingsModal();
+    }
+
+    async function runWorkerHealthCheck() {
+      const targetUrl = document.getElementById('workerUrlInput').value.trim().replace(/\/$/, '');
+      const out = document.getElementById('healthCheckResult');
+      out.innerHTML = `<span class="text-sky-400"><i class="fa-solid fa-circle-notch animate-spin mr-2"></i>Pinging ${targetUrl}/health ...</span>`;
+
+      try {
+        const res = await fetch(`${targetUrl}/health`, { method: 'GET' });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'ok') {
+          out.innerHTML = `
+            <div class="text-emerald-400 space-y-1">
+              <div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-check-circle"></i> Connection Verified!</div>
+              <div class="text-[11px] text-slate-300">Worker reachable: <strong>${data.worker}</strong></div>
+              <div class="text-[11px] text-slate-300">Stripe Secret Key: <span class="text-emerald-300 font-bold">${data.stripe_mode || 'Active'}</span></div>
+            </div>`;
+        } else {
+          out.innerHTML = `<div class="text-rose-400 font-bold"><i class="fa-solid fa-xmark mr-1"></i> Worker Error (${res.status}): ${data.error || 'Unknown response'}</div>`;
+        }
+      } catch (err) {
+        out.innerHTML = `<div class="text-rose-400 font-bold leading-tight"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Network/CORS Failed: ${err.message}<br><span class="text-[10px] text-slate-400 font-normal mt-1 block">Ensure worker is deployed and Access-Control-Allow-Origin is enabled.</span></div>`;
+      }
+    }
+
+    let paymentSchedule = 'upfront';
+    let pendingDropdownReturn = null;
+    let editingSkuId = null;
+    let activeClaimPolicy = null;
+    let confirmCallback = null;
+    let pollingInterval = null;
+    let pendingTransaction = null;
+
+    let currentQuoteState = {
+      basePremium12: 0,
+      unadjustedTotal: 0,
+      discountVal: 0,
+      couponVal: 0,
+      finalTotalPremium: 0,
+      monthlyPayment: 0,
+      isOverridden: false
+    };
+
+    let skus = [
+      { id: 'ip16pm', type: 'Smartphone', brand: 'Apple', model: 'iPhone 16 Pro Max', screenCost: 289, batteryCost: 79, boardCost: 395, caseCost: 139 },
+      { id: 'ip15p', type: 'Smartphone', brand: 'Apple', model: 'iPhone 15 Pro', screenCost: 269, batteryCost: 69, boardCost: 380, caseCost: 120 },
+      { id: 's24u', type: 'Smartphone', brand: 'Samsung', model: 'Galaxy S24 Ultra', screenCost: 259, batteryCost: 65, boardCost: 360, caseCost: 110 },
+      { id: 'mbp16', type: 'Laptop', brand: 'Apple', model: 'MacBook Pro 16"', screenCost: 499, batteryCost: 149, boardCost: 680, caseCost: 240 },
+      { id: 'dlxps', type: 'Laptop', brand: 'Dell', model: 'XPS 15', screenCost: 350, batteryCost: 110, boardCost: 500, caseCost: 180 }
+    ];
+
+    let policies = [
+      {
+        id: 'AMY-2026-914022', customerName: 'Navneet Gill', customerEmail: 'nav.gill@torontotech.ca', customerPhone: '(416) 555-0199',
+        customerAddress1: '68 Chesterwood Cres', customerAddress2: '#2', customerCity: 'Brampton', customerProvince: 'ON', customerPostal: 'L6Y 0Z4',
+        deviceType: 'Smartphone', deviceBrand: 'Apple', deviceSku: 'iPhone 16 Pro Max', deviceSerial: '358921098234199', deviceDesc: 'Blue Titanium, pristine', laptopSpecs: '',
+        coverage: ['Display & Glass Replacement', 'Battery Replacement'], termMonths: 24, issueDate: '2026-09-01', expiryDate: '2028-09-01', totalPremium: 397.44, paymentSchedule: 'upfront',
+        couponCode: '', couponValue: 0,
+        claims: [
+          { claimId: 'CLM-001', date: '2026-09-08', component: 'Display & Glass Replacement', skuCost: 289, deductible: 57.80, status: 'Repaired' }
+        ]
+      },
+      {
+        id: 'AMY-2026-914023', customerName: 'Sarah Connor', customerEmail: 'sconnor@cyberdyne.ca', customerPhone: '(647) 992-8833',
+        customerAddress1: '123 Skynet Way', customerAddress2: '', customerCity: 'Toronto', customerProvince: 'ON', customerPostal: 'M5V 1B4',
+        deviceType: 'Laptop', deviceBrand: 'Apple', deviceSku: 'MacBook Pro 16"', deviceSerial: 'MAC-8819203948', deviceDesc: '', laptopSpecs: 'Regular | 32GB | 1TB',
+        coverage: ['Display & Glass Replacement', 'Motherboard'], termMonths: 36, issueDate: '2026-08-15', expiryDate: '2029-08-15', totalPremium: 1910.88, paymentSchedule: 'upfront',
+        couponCode: 'WELCOME50', couponValue: 50.00,
+        claims: []
+      }
+    ];
+
+    function showToast(msg, type = 'error') {
+      const c = document.getElementById('toastContainer');
+      if (!c) return;
+      const t = document.createElement('div');
+      const isErr = type === 'error';
+      t.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border ${isErr ? 'bg-rose-950 border-rose-500/50 text-rose-200' : 'bg-emerald-950 border-emerald-500/50 text-emerald-200'} text-xs font-bold font-mono max-w-sm`;
+      t.innerHTML = `<i class="fa-solid ${isErr ? 'fa-triangle-exclamation text-rose-500' : 'fa-check-circle text-emerald-500'} text-base"></i><span>${msg}</span>`;
+      c.appendChild(t);
+      setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; setTimeout(() => t.remove(), 300); }, 3500);
+    }
+
+    function showConfirmModal(title, msg, onConfirm) {
+      document.getElementById('confirmModalTitle').textContent = title;
+      document.getElementById('confirmModalMessage').textContent = msg;
+      confirmCallback = onConfirm;
+      document.getElementById('confirmActionBtn').onclick = () => {
+        if (confirmCallback) confirmCallback();
+        closeConfirmModal();
+      };
+      document.getElementById('customConfirmModal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('customConfirmModal').classList.add('hidden');
+      confirmCallback = null;
+    }
+
+    const phoneInput = document.getElementById('custPhone');
+    if (phoneInput) {
+      phoneInput.addEventListener('input', function(e) {
+        let x = e.target.value.replace(/\D/g, '').match(/(\d{0,3})(\d{0,3})(\d{0,4})/);
+        e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
+      });
+    }
+
+    function initDates() {
+      const today = new Date().toISOString().split('T')[0];
+      const issueEl = document.getElementById('issueDate');
+      if (issueEl) issueEl.value = today;
+      updateExpiryDate();
+    }
+    
+    function updateExpiryDate() {
+      const issueStr = document.getElementById('issueDate').value;
+      const term = parseInt(document.getElementById('warrantyTerm').value) || 12;
+      if (issueStr) {
+        let d = new Date(issueStr);
+        d.setMonth(d.getMonth() + term);
+        const expEl = document.getElementById('expiryDate');
+        if (expEl) expEl.value = d.toISOString().split('T')[0];
+      }
+    }
+
+    function populateDropdowns() {
+      const typeSelect = document.getElementById('deviceTypeSelect');
+      const types = [...new Set(skus.map(s => s.type))];
+      typeSelect.innerHTML = `<option value="NEW" class="text-[#F58220] font-bold">+ Create New</option>` + types.map(t => `<option value="${t}">${t}</option>`).join('');
+      
+      if (typeSelect.options.length > 1) {
+        typeSelect.value = types.includes('Smartphone') ? 'Smartphone' : types[0];
+      }
+      handleDeviceTypeChange();
+    }
+
+    function handleDeviceTypeChange() {
+      const typeVal = document.getElementById('deviceTypeSelect').value;
+      if (typeVal === 'NEW') return openCreateSkuModal('type');
+
+      const brandSelect = document.getElementById('deviceBrandSelect');
+      const brands = [...new Set(skus.filter(s => s.type === typeVal).map(s => s.brand))];
+      brandSelect.innerHTML = `<option value="NEW" class="text-[#F58220] font-bold">+ Create New</option>` + brands.map(b => `<option value="${b}">${b}</option>`).join('');
+      if (brandSelect.options.length > 1) brandSelect.value = brands[0];
+      
+      const laptopContainer = document.getElementById('laptopSpecsContainer');
+      if (typeVal === 'Laptop') laptopContainer.classList.remove('hidden');
+      else laptopContainer.classList.add('hidden');
+
+      handleDeviceBrandChange();
+    }
+
+    function handleDeviceBrandChange() {
+      const brandVal = document.getElementById('deviceBrandSelect').value;
+      if (brandVal === 'NEW') return openCreateSkuModal('brand');
+
+      const typeVal = document.getElementById('deviceTypeSelect').value;
+      const modelSelect = document.getElementById('deviceModelSelect');
+      const models = skus.filter(s => s.type === typeVal && s.brand === brandVal);
+      
+      modelSelect.innerHTML = `<option value="NEW" class="text-[#F58220] font-bold">+ Create New</option>` + models.map(m => `<option value="${m.id}">${m.model}</option>`).join('');
+      if (modelSelect.options.length > 1) modelSelect.value = models[0].id;
+      
+      recalculateQuote();
+    }
+
+    function getSku(id) { return skus.find(s => s.id === id) || null; }
+
+    function recalculateQuote() {
+      const modelVal = document.getElementById('deviceModelSelect').value;
+      if (modelVal === 'NEW') return openCreateSkuModal('model');
+      
+      const sku = getSku(modelVal);
+      if (!sku) return;
+
+      document.getElementById('pricingTierBadge').textContent = sku.type;
+      
+      const parts = [
+        { id: 'screen', checked: document.getElementById('cov_screen').checked, cost: sku.screenCost },
+        { id: 'battery', checked: document.getElementById('cov_battery').checked, cost: sku.batteryCost },
+        { id: 'board', checked: document.getElementById('cov_board').checked, cost: sku.boardCost },
+        { id: 'case', checked: document.getElementById('cov_case').checked, cost: sku.caseCost }
+      ];
+
+      let totalMaxCov = 0;
+      let yearlyPremium = 0; // Yearly Base Premium (12 months)
+
+      parts.forEach(p => {
+        const maxCov = p.cost * 3.0;
+        const prem = p.cost * 0.60;
+        const ded = p.cost * 0.20;
+        
+        document.getElementById(`cov_max_${p.id}`).textContent = `$${maxCov.toFixed(2)}`;
+        document.getElementById(`cov_prem_${p.id}`).textContent = `$${prem.toFixed(2)}`;
+        document.getElementById(`cov_ded_${p.id}`).textContent = `$${ded.toFixed(2)}`;
+        
+        if (p.checked) {
+          totalMaxCov += maxCov;
+          yearlyPremium += prem;
+        }
+      });
+
+      const term = parseInt(document.getElementById('warrantyTerm').value) || 12;
+      const couponCode = document.getElementById('couponCode').value.trim();
+      const rawCouponValue = parseFloat(document.getElementById('couponValue').value) || 0;
+      const couponVal = Math.abs(rawCouponValue);
+      
+      const overrideVal = document.getElementById('manualPremiumOverride').value;
+      currentQuoteState.isOverridden = (overrideVal && overrideVal.trim() !== '');
+
+      let finalTotalPremium = 0;
+      let monthlyPayment = 0;
+      let upfrontDiscountValue = 0;
+      
+      currentQuoteState.yearlyPremium = yearlyPremium;
+      currentQuoteState.basePremium12 = yearlyPremium;
+      currentQuoteState.couponVal = couponVal;
+
+      if (currentQuoteState.isOverridden) {
+        const overrideNum = Math.max(0, parseFloat(overrideVal) || 0);
+        if (paymentSchedule === 'monthly') {
+          monthlyPayment = overrideNum;
+          finalTotalPremium = overrideNum * term;
+        } else {
+          finalTotalPremium = overrideNum;
+          monthlyPayment = 0;
+        }
+        currentQuoteState.unadjustedTotal = finalTotalPremium;
+        currentQuoteState.couponVal = 0;
+        currentQuoteState.discountVal = 0;
+      } else {
+        if (paymentSchedule === 'monthly') {
+          // STRICT RULE: MONTHLY PREMIUM = YEARLY PREMIUM / 12
+          const baseMonthly = yearlyPremium / 12.0;
+          // Coupon applies directly as flat reduction to monthly payment
+          monthlyPayment = Math.max(0, baseMonthly - couponVal);
+          finalTotalPremium = monthlyPayment * term;
+          upfrontDiscountValue = 0;
+          currentQuoteState.unadjustedTotal = baseMonthly * term;
+        } else {
+          // UPFRONT: Prorated by term (Yearly * Term / 12)
+          const unadjustedTotal = yearlyPremium * (term / 12.0);
+          currentQuoteState.unadjustedTotal = unadjustedTotal;
+          const postCouponTotal = Math.max(0, unadjustedTotal - couponVal);
+          upfrontDiscountValue = postCouponTotal * 0.10;
+          finalTotalPremium = Math.max(0, postCouponTotal - upfrontDiscountValue);
+          monthlyPayment = 0;
+        }
+        currentQuoteState.discountVal = upfrontDiscountValue;
+      }
+
+      currentQuoteState.finalTotalPremium = finalTotalPremium;
+      currentQuoteState.monthlyPayment = monthlyPayment;
+      
+      updateQuoteUI(term, totalMaxCov, couponCode);
+    }
+
+    function updateQuoteUI(term, totalMaxCov, couponCode) {
+      const priceLabel = document.getElementById('priceLabel');
+      const priceTermBadge = document.getElementById('priceTermBadge');
+      const discountIndicator = document.getElementById('discountIndicator');
+      const displayTotalPremium = document.getElementById('displayTotalPremium');
+      
+      priceTermBadge.textContent = `${term}-Month Plan`;
+
+      let cornerHTML = '';
+
+      if (currentQuoteState.isOverridden) {
+        cornerHTML = `<div class="text-amber-400 font-bold">Manual Override Active</div>`;
+      } else {
+        if (paymentSchedule === 'upfront') {
+          if (currentQuoteState.couponVal > 0) {
+            cornerHTML += `<div class="text-rose-400 mb-0.5"><span class="uppercase">${couponCode || 'Coupon'}</span>: -$${currentQuoteState.couponVal.toFixed(2)}</div>`;
+          }
+          if (currentQuoteState.discountVal > 0) {
+            cornerHTML += `<div class="text-[#F58220]">10% Upfront Savings: -$${currentQuoteState.discountVal.toFixed(2)}</div>`;
+          }
+        } else {
+          if (currentQuoteState.couponVal > 0) {
+            cornerHTML += `<div class="text-rose-400 mb-0.5"><span class="uppercase">${couponCode || 'Coupon'}</span>: -$${currentQuoteState.couponVal.toFixed(2)}/mo</div>`;
+          }
+          cornerHTML += `<div class="text-slate-400">Total Contract: <span class="text-white font-bold">$${currentQuoteState.finalTotalPremium.toFixed(2)}</span> (${term} mos)</div>`;
+        }
+      }
+
+      discountIndicator.innerHTML = cornerHTML;
+
+      if (paymentSchedule === 'upfront') {
+        priceLabel.textContent = 'Total Premium';
+        displayTotalPremium.textContent = `$${currentQuoteState.finalTotalPremium.toFixed(2)}`;
+      } else {
+        priceLabel.textContent = 'Monthly Premium';
+        displayTotalPremium.textContent = `$${currentQuoteState.monthlyPayment.toFixed(2)}/mo`;
+      }
+      
+      const lineItemsHTML = `
+        <div class="flex justify-between items-center"><span class="font-bold text-white">Term Duration:</span><span class="font-mono text-white font-bold bg-[#F58220] px-2 rounded">${term} Months</span></div>
+        <div class="flex justify-between mt-2"><span class="text-slate-400">Total Coverage:</span><span class="font-mono text-emerald-400 font-bold">$${totalMaxCov.toFixed(2)}</span></div>
+        <div class="flex justify-between mt-2"><span class="text-slate-400">Yearly Base Rate:</span><span class="font-mono text-slate-300 font-bold">$${currentQuoteState.yearlyPremium.toFixed(2)}/yr</span></div>
+        <div class="flex justify-between mt-2"><span class="text-slate-400">Total Contract Value:</span><span class="font-mono text-white font-bold">$${currentQuoteState.finalTotalPremium.toFixed(2)}</span></div>
+      `;
+      document.getElementById('quoteLineItems').innerHTML = lineItemsHTML;
+    }
+
+    function applyManualPremium() { recalculateQuote(); }
+
+    function setPaymentSchedule(type) { 
+      paymentSchedule = type; 
+      const btnUpfront = document.getElementById('payTypeUpfront');
+      const btnMonthly = document.getElementById('payTypeMonthly');
+      
+      if (type === 'upfront') {
+        btnUpfront.className = "py-2.5 px-3 rounded-xl text-xs font-bold border border-[#F58220] bg-[#F58220] text-white transition shadow-lg shadow-[#F58220]/20";
+        btnMonthly.className = "py-2.5 px-3 rounded-xl text-xs font-bold border border-[#005BAC] bg-[#005BAC] text-white transition opacity-60 hover:opacity-100";
+      } else {
+        btnMonthly.className = "py-2.5 px-3 rounded-xl text-xs font-bold border border-[#F58220] bg-[#F58220] text-white transition shadow-lg shadow-[#F58220]/20";
+        btnUpfront.className = "py-2.5 px-3 rounded-xl text-xs font-bold border border-[#005BAC] bg-[#005BAC] text-white transition opacity-60 hover:opacity-100";
+      }
+      recalculateQuote(); 
+    }
+
+    async function initiateRealStripePayment(amount, description, callback) {
+      if (amount < 0.50) {
+        return showToast("Transaction amount must be at least $0.50 CAD to process via Stripe.", "error");
+      }
+
+      const workerUrl = getWorkerUrl();
+      if (workerUrl.includes("yourusername")) {
+        openGatewaySettingsModal();
+        return showToast("Please configure your live Cloudflare Worker URL before charging.", "error");
+      }
+
+      pendingTransaction = { amount, description, callback };
+
+      document.getElementById('stripeTxAmount').textContent = `$${amount.toFixed(2)}`;
+      document.getElementById('stripeTxDesc').textContent = description;
+      document.getElementById('stripeStatusText').textContent = "Connecting to Cloudflare Gateway...";
+      document.getElementById('stripeSubtext').textContent = "Requesting PaymentIntent from Stripe...";
+      document.getElementById('stripeIntentBadge').classList.add('hidden');
+      document.getElementById('stripeModalErrorBox').classList.add('hidden');
+      document.getElementById('stripePollCounter').textContent = "Attempt: 0";
+      document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-circle-notch animate-spin text-xl"></i>`;
+      document.getElementById('stripeGatewayModal').classList.remove('hidden');
+
+      try {
+        const response = await fetch(`${workerUrl}/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amount,
+            currency: "cad",
+            description: description
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error || `HTTP ${response.status} from Gateway`);
+        }
+
+        const intentId = data.paymentIntentId;
+        if (!intentId) {
+          throw new Error("Worker returned success but missing paymentIntentId");
+        }
+
+        // Show live Intent ID on modal
+        document.getElementById('stripeIntentIdText').textContent = intentId;
+        document.getElementById('stripeIntentBadge').classList.remove('hidden');
+        document.getElementById('stripeStatusText').textContent = "Awaiting Terminal / Link Payment...";
+        document.getElementById('stripeSubtext').textContent = "Customer must tap on terminal or complete link. Polling every 3s...";
+
+        // Start REAL live polling against the Cloudflare Worker
+        pollStripeStatus(intentId, callback);
+
+      } catch (err) {
+        console.error("Stripe initiation error:", err);
+        document.getElementById('stripeSpinnerIcon').innerHTML = `<i class="fa-solid fa-triangle-exclamation text-rose-500 text-xl"></i>`;
+        document.getElementById('stripeStatusText').textContent = "Gateway Connection Failed";
+        document.getElementById('stripeSubtext').textContent = "Could not create PaymentIntent in Stripe.";
+        document.getElementById('stripeModalErrorText').textContent = err.message;
+        document.getElementById('stripeModalErrorBox').classList.remove('hidden');
+      }
+    }
+
+    function pollStripeStatus(intentId, successCallback) {
+      if (pollingInterval) clearInterval(pollingInterval);
+      const workerUrl = getWorkerUrl();
+      let pollCount = 0;
+
+      pollingInterval = setInterval(async () => {
+        try {
+          pollCount++;
+          document.getElementById('stripePollCounter').textContent = `Poll #${pollCount}`;
+
+          const res = await fetch(`${workerUrl}/check?id=${encodeURIComponent(intentId)}`, {
+            method: "GET"
+          });
+
+          if (!res.ok) {
+            console.warn(`Poll returned HTTP ${res.status}`);
+            return;
+          }
+
+          const checkData = await res.json();
+          const status = checkData.status;
+
+          document.getElementById('stripeSubtext').textContent = `Current status on Stripe: [${status}]`;
+
+          if (status === "succeeded") {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            document.getElementById('stripeGatewayModal').classList.add('hidden');
+            showToast('Stripe Payment Cleared! Record saved.', 'success');
+            pendingTransaction = null;
+            successCallback();
+          } else if (status === "canceled") {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            cancelPayment("Payment was cancelled in Stripe.");
+          }
+        } catch (error) {
+          console.warn("Polling transient error:", error);
+        }
+      }, 3000);
+    }
+
+    function cancelPayment(reason = "Transaction cancelled by operator.") {
+      if (pollingInterval) clearInterval(pollingInterval);
+      pollingInterval = null;
+      pendingTransaction = null;
+      document.getElementById('stripeGatewayModal').classList.add('hidden');
+      showToast(reason, 'error');
+    }
+
+    function loadSampleCustomer() {
+      document.getElementById('custName').value = 'John Connor';
+      document.getElementById('custEmail').value = 'jconnor@techcom.ca';
+      document.getElementById('custPhone').value = '(416) 555-0199';
+      document.getElementById('custAddress1').value = '123 Skynet Way';
+      document.getElementById('custAddress2').value = 'Suite 404';
+      document.getElementById('custCity').value = 'Brampton';
+      document.getElementById('custProvince').value = 'ON';
+      document.getElementById('custPostal').value = 'L6Y 0Z4';
+      document.getElementById('deviceSerial').value = '12389102938100';
+      document.getElementById('deviceDesc').value = 'Midnight Black. Mint condition.';
+    }
+
+    function handleIssuePolicy(e) {
+      e.preventDefault();
+      
+      const modelVal = document.getElementById('deviceModelSelect').value;
+      if (modelVal === 'NEW') return showToast('Please select or create a valid device model.');
+      const sku = getSku(modelVal);
+      
+      let cov = [];
+      if (document.getElementById('cov_screen').checked) cov.push('Display & Glass Replacement');
+      if (document.getElementById('cov_battery').checked) cov.push('Battery Replacement');
+      if (document.getElementById('cov_board').checked) cov.push('Motherboard');
+      if (document.getElementById('cov_case').checked) cov.push('Chassis Replacement');
+
+      if (cov.length === 0) return showToast('Select at least 1 coverage option.');
+
+      const term = parseInt(document.getElementById('warrantyTerm').value) || 12;
+      const totalContractValue = currentQuoteState.finalTotalPremium;
+      const stripeChargeAmount = paymentSchedule === 'upfront' ? totalContractValue : currentQuoteState.monthlyPayment;
+
+      let laptopSpecs = '';
+      if (sku.type === 'Laptop') {
+        const scr = document.getElementById('laptopScreen').value;
+        const ram = document.getElementById('laptopRam').value;
+        const sto = document.getElementById('laptopStorage').value;
+        laptopSpecs = [scr, ram, sto].filter(Boolean).join(' | ');
+      }
+
+      const newPolData = {
+        id: `AMY-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`,
+        customerName: document.getElementById('custName').value,
+        customerEmail: document.getElementById('custEmail').value,
+        customerPhone: document.getElementById('custPhone').value,
+        customerAddress1: document.getElementById('custAddress1').value,
+        customerAddress2: document.getElementById('custAddress2').value,
+        customerCity: document.getElementById('custCity').value,
+        customerProvince: document.getElementById('custProvince').value,
+        customerPostal: document.getElementById('custPostal').value,
+        deviceType: sku.type,
+        deviceBrand: sku.brand,
+        deviceSku: sku.model, 
+        deviceSerial: document.getElementById('deviceSerial').value,
+        deviceDesc: document.getElementById('deviceDesc').value,
+        laptopSpecs: laptopSpecs,
+        coverage: cov, 
+        termMonths: term, 
+        totalPremium: totalContractValue, 
+        monthlyPayment: currentQuoteState.monthlyPayment,
+        couponCode: currentQuoteState.isOverridden ? '' : document.getElementById('couponCode').value,
+        couponValue: currentQuoteState.couponVal,
+        issueDate: document.getElementById('issueDate').value,
+        expiryDate: document.getElementById('expiryDate').value,
+        paymentSchedule: paymentSchedule,
+        claims: []
+      };
+
+      document.getElementById('stripeTxType').textContent = paymentSchedule === 'upfront' ? 'Policy Premium (Upfront)' : 'Policy Premium (Month 1)';
+      initiateRealStripePayment(
+        stripeChargeAmount,
+        `${sku.model} - ${term} Mo Care+`,
+        () => finalizePolicyIssuance(newPolData)
+      );
+    }
+
+    function finalizePolicyIssuance(newPol) {
+      policies.unshift(newPol);
+      confetti({ particleCount: 50, spread: 60, colors: ['#005BAC', '#F58220']});
+      
+      updatePolicyDatalist();
+      renderLedgerTable();
+      renderClaimsLedger();
+      renderAnalytics();
+      viewCertificate(newPol.id);
+      
+      document.getElementById('posForm').reset(); 
+      document.getElementById('manualPremiumOverride').value = '';
+      initDates();
+      handleDeviceTypeChange(); 
+      recalculateQuote();
+    }
+
+    function updatePolicyDatalist() {
+      const dl = document.getElementById('policySearchList');
+      if (dl) dl.innerHTML = policies.map(p => `<option value="${p.id}">${p.customerName} - ${p.deviceBrand} ${p.deviceSku}</option>`).join('');
+    }
+
+    function lookupPolicyForClaim() {
+      const q = document.getElementById('claimLookupId').value.toUpperCase().trim();
+      const p = policies.find(x => x.id.toUpperCase() === q || x.customerName.toUpperCase() === q || `${x.id} - ${x.customerName}`.toUpperCase().includes(q));
+      
+      const card = document.getElementById('claimActivePolicyCard');
+      const compSelect = document.getElementById('claimComponent');
+      
+      if (p) {
+        activeClaimPolicy = p;
+        document.getElementById('claimPolCustomer').textContent = p.customerName;
+        document.getElementById('claimPolDevice').textContent = `${p.deviceSku} (${p.deviceSerial})`;
+        document.getElementById('claimPolScope').textContent = p.coverage.join(', ');
+        
+        const availableComps = p.coverage.filter(c => !p.claims.some(claim => claim.component === c));
+        
+        if (availableComps.length === 0) {
+          compSelect.innerHTML = `<option value="">-- All Coverage Claims Exhausted --</option>`;
+          compSelect.disabled = true;
+        } else {
+          const skuObj = skus.find(s => s.model === p.deviceSku) || skus[0];
+          compSelect.innerHTML = availableComps.map(c => {
+             let cost = 0;
+             if (c.includes('Display')) cost = skuObj.screenCost;
+             if (c.includes('Battery')) cost = skuObj.batteryCost;
+             if (c.includes('Board') || c.includes('Motherboard')) cost = skuObj.boardCost;
+             if (c.includes('Chassis')) cost = skuObj.caseCost;
+             const ded = cost * 0.20;
+             return `<option value="${c}">${c} (Deductible: $${ded.toFixed(2)})</option>`;
+          }).join('');
+          compSelect.disabled = false;
+        }
+        card.classList.remove('hidden');
+      } else {
+        activeClaimPolicy = null;
+        card.classList.add('hidden');
+        compSelect.innerHTML = `<option value="">-- Lookup Policy First --</option>`;
+        compSelect.disabled = true;
+      }
+    }
+
+    function processClaim() {
+      if (!activeClaimPolicy) return showToast("Lookup a valid policy first.");
+      
+      const comp = document.getElementById('claimComponent').value;
+      if (!comp) return showToast("Please select a valid component.");
+      if (!activeClaimPolicy.coverage.includes(comp)) return showToast(`DENIED: Policy lacks scope for [${comp}].`);
+
+      const skuObj = skus.find(s => s.model === activeClaimPolicy.deviceSku) || skus[0];
+      let rawCost = 0;
+      if (comp.includes('Display')) rawCost = skuObj.screenCost;
+      if (comp.includes('Battery')) rawCost = skuObj.batteryCost;
+      if (comp.includes('Board') || comp.includes('Motherboard')) rawCost = skuObj.boardCost;
+      if (comp.includes('Chassis')) rawCost = skuObj.caseCost;
+      
+      const deductibleAmt = rawCost * 0.20;
+
+      const newClaimData = {
+        claimId: `CLM-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: new Date().toISOString().split('T')[0],
+        component: comp, 
+        skuCost: rawCost, 
+        deductible: deductibleAmt, 
+        status: 'Repaired'
+      };
+
+      document.getElementById('stripeTxType').textContent = 'Repair Deductible';
+      initiateRealStripePayment(
+        deductibleAmt,
+        `Claim Deductible against ${activeClaimPolicy.id} for ${comp}`,
+        () => finalizeClaimProcessing(newClaimData) 
+      );
+    }
+
+    function finalizeClaimProcessing(newClaim) {
+      activeClaimPolicy.claims.push(newClaim);
+      
+      document.getElementById('claimLookupId').value = '';
+      document.getElementById('claimActivePolicyCard').classList.add('hidden');
+      document.getElementById('claimComponent').disabled = true;
+      
+      viewCertificate(activeClaimPolicy.id);
+      activeClaimPolicy = null;
+      
+      renderClaimsLedger();
+      renderLedgerTable();
+      renderAnalytics();
+      
+      confetti({ particleCount: 30, spread: 40, colors: ['#EF4444', '#10B981']});
+    }
+
+    function renderClaimsLedger() {
+      const tbody = document.getElementById('claimsLedgerBody');
+      let allClaims = [];
+      policies.forEach(p => p.claims.forEach(c => allClaims.push({ policy: p, claim: c })));
+      
+      allClaims.sort((a, b) => b.claim.date.localeCompare(a.claim.date)); 
+      document.getElementById('totalClaimsCounter').textContent = `${allClaims.length} Total Claims`;
+
+      tbody.innerHTML = allClaims.map(ac => `
+        <tr class="hover:bg-slate-800/50 transition">
+          <td class="p-3">
+            <div class="text-white font-bold">${ac.claim.claimId}</div>
+            <div class="text-[10px] text-slate-500">${ac.claim.date}</div>
+          </td>
+          <td class="p-3">
+            <div class="text-[#005BAC] font-bold cursor-pointer hover:underline" onclick="switchTab('ledger', '${ac.policy.id}')">${ac.policy.id}</div>
+            <div class="text-[10px] text-slate-400">${ac.policy.customerName}</div>
+          </td>
+          <td class="p-3 text-slate-300 text-[10px]">${ac.claim.component}</td>
+          <td class="p-3 text-right font-bold text-[#F58220]">$${ac.claim.deductible.toFixed(2)}</td>
+          <td class="p-3 text-right font-bold text-rose-400">$${ac.claim.skuCost.toFixed(2)}</td>
+          <td class="p-3 text-center">
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] border border-emerald-500/20">${ac.claim.status}</span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderUnderwritingGrid() {
+      document.getElementById('underwritingTableBody').innerHTML = skus.map(s => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 pl-4 font-bold text-white">${s.brand} ${s.model} <span class="text-[9px] text-[#F58220] ml-1 font-mono bg-[#F58220]/10 px-1 rounded border border-[#F58220]/20">${s.type}</span></td>
+          <td class="p-3 text-right text-slate-300 font-mono">$${s.screenCost.toFixed(2)}</td>
+          <td class="p-3 text-right text-slate-300 font-mono">$${s.batteryCost.toFixed(2)}</td>
+          <td class="p-3 text-right text-slate-300 font-mono">$${s.boardCost.toFixed(2)}</td>
+          <td class="p-3 text-right text-slate-300 font-mono">$${s.caseCost.toFixed(2)}</td>
+          <td class="p-3 text-center flex justify-center gap-2">
+            <button type="button" onclick="editSku('${s.id}')" title="Edit SKU" class="px-2 py-1 bg-slate-800 hover:bg-[#005BAC] text-slate-300 hover:text-white rounded transition text-[10px] shadow-sm"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" onclick="deleteSku('${s.id}')" title="Delete SKU" class="px-2 py-1 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white rounded transition text-[10px] shadow-sm"><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openCreateSkuModal(triggeredBy) {
+      pendingDropdownReturn = triggeredBy; 
+      document.getElementById('newSkuForm').reset();
+      document.getElementById('createSkuModalTitle').textContent = "Add New Device to Rates";
+      document.getElementById('createSkuModalBtn').textContent = "Add to Rates Matrix";
+      editingSkuId = null;
+      
+      const typeSelect = document.getElementById('deviceTypeSelect').value;
+      const brandSelect = document.getElementById('deviceBrandSelect').value;
+
+      if (triggeredBy === 'brand' || triggeredBy === 'model') {
+        document.getElementById('newSkuType').value = (typeSelect && typeSelect !== 'NEW') ? typeSelect : 'Smartphone';
+      }
+      if (triggeredBy === 'model') {
+        document.getElementById('newSkuBrand').value = (brandSelect && brandSelect !== 'NEW') ? brandSelect : '';
+      }
+
+      document.getElementById('createSkuModal').classList.remove('hidden'); 
+    }
+
+    function editSku(id) {
+      editingSkuId = id;
+      const sku = getSku(id);
+      if (!sku) return;
+      
+      document.getElementById('newSkuType').value = sku.type;
+      document.getElementById('newSkuBrand').value = sku.brand;
+      document.getElementById('newSkuModel').value = sku.model;
+      document.getElementById('newSkuScreen').value = sku.screenCost;
+      document.getElementById('newSkuBattery').value = sku.batteryCost;
+      document.getElementById('newSkuBoard').value = sku.boardCost;
+      document.getElementById('newSkuCase').value = sku.caseCost;
+      
+      document.getElementById('createSkuModalTitle').textContent = "Edit Device Rates";
+      document.getElementById('createSkuModalBtn').textContent = "Save Changes";
+      
+      document.getElementById('createSkuModal').classList.remove('hidden');
+    }
+
+    function deleteSku(id) {
+      const sku = getSku(id);
+      const name = sku ? `${sku.brand} ${sku.model}` : 'this SKU';
+      showConfirmModal(
+        "Delete Hardware SKU",
+        `Are you sure you want to permanently delete "${name}" from your underwriting rates?`,
+        () => {
+          skus = skus.filter(s => s.id !== id);
+          populateDropdowns();
+          renderUnderwritingGrid();
+          showToast('SKU deleted successfully.', 'success');
+        }
+      );
+    }
+    
+    function closeCreateSkuModal() { 
+      document.getElementById('createSkuModal').classList.add('hidden'); 
+      document.getElementById('newSkuForm').reset();
+      document.getElementById('createSkuModalTitle').textContent = "Add New Device to Rates";
+      document.getElementById('createSkuModalBtn').textContent = "Add to Rates Matrix";
+      editingSkuId = null;
+
+      if (pendingDropdownReturn === 'type') populateDropdowns();
+      else if (pendingDropdownReturn === 'brand') handleDeviceTypeChange();
+      else if (pendingDropdownReturn === 'model') handleDeviceBrandChange();
+      pendingDropdownReturn = null;
+    }
+
+    function handleCreateSku(e) {
+      e.preventDefault();
+      const newSkuData = {
+        type: document.getElementById('newSkuType').value,
+        brand: document.getElementById('newSkuBrand').value,
+        model: document.getElementById('newSkuModel').value,
+        screenCost: parseFloat(document.getElementById('newSkuScreen').value) || 0,
+        batteryCost: parseFloat(document.getElementById('newSkuBattery').value) || 0,
+        boardCost: parseFloat(document.getElementById('newSkuBoard').value) || 0,
+        caseCost: parseFloat(document.getElementById('newSkuCase').value) || 0
+      };
+
+      if (editingSkuId) {
+        const idx = skus.findIndex(s => s.id === editingSkuId);
+        if (idx > -1) skus[idx] = { ...skus[idx], ...newSkuData, id: editingSkuId };
+        showToast('SKU updated successfully!', 'success');
+      } else {
+        newSkuData.id = 'sku_' + Math.random().toString(36).substr(2, 9);
+        skus.push(newSkuData); 
+        showToast('New SKU added successfully!', 'success');
+      }
+      
+      closeCreateSkuModal();
+      populateDropdowns();
+      
+      document.getElementById('deviceTypeSelect').value = newSkuData.type;
+      handleDeviceTypeChange();
+      document.getElementById('deviceBrandSelect').value = newSkuData.brand;
+      handleDeviceBrandChange();
+      
+      const targetId = editingSkuId || newSkuData.id;
+      const modelOpt = document.querySelector(`#deviceModelSelect option[value="${targetId}"]`);
+      if (modelOpt) document.getElementById('deviceModelSelect').value = targetId;
+      
+      recalculateQuote();
+      renderUnderwritingGrid();
+    }
+
+    function renderLedgerTable() {
+      const q = (document.getElementById('ledgerSearchInput').value || '').toLowerCase();
+      const tbody = document.getElementById('ledgerTableBody');
+      
+      let filtered = policies;
+      if (q === 'has:claims') {
+        filtered = policies.filter(p => p.claims.length > 0);
+      } else if (q) {
+        filtered = policies.filter(p => p.id.toLowerCase().includes(q) || p.customerName.toLowerCase().includes(q) || p.deviceSerial.toLowerCase().includes(q));
+      }
+
+      tbody.innerHTML = filtered.map(p => {
+        const claimBadge = p.claims.length > 0 
+          ? `<span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 text-[10px] border border-rose-500/20 font-bold">${p.claims.length} Claim(s)</span>`
+          : `<span class="text-[10px] text-slate-500">Zero Claims</span>`;
+
+        return `
+        <tr class="hover:bg-slate-800/40">
+          <td class="p-3 pl-4">
+            <div class="font-bold text-[#005BAC] cursor-pointer hover:underline" onclick="switchTab('claims', '${p.id}')">${p.id}</div>
+            <div class="text-[9px] text-slate-500">${p.issueDate} to ${p.expiryDate}</div>
+          </td>
+          <td class="p-3">
+            <div class="font-bold text-white">${p.customerName}</div>
+            <div class="text-[9px] text-slate-400">${p.customerEmail} | ${p.customerPhone || ''}</div>
+          </td>
+          <td class="p-3">
+            <div class="text-slate-300 text-[11px] font-bold">${p.deviceBrand} ${p.deviceSku}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${p.deviceSerial}</div>
+          </td>
+          <td class="p-3 text-center">${claimBadge}</td>
+          <td class="p-3 text-right font-bold text-emerald-400">$${p.totalPremium.toFixed(2)}<div class="text-[9px] text-slate-500 uppercase">${p.paymentSchedule}</div></td>
+          <td class="p-3 text-center flex justify-center gap-2">
+            <button type="button" onclick="viewCertificate('${p.id}')" class="px-2.5 py-1.5 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-lg text-[10px] transition font-bold"><i class="fa-solid fa-file-invoice"></i> Cert</button>
+            <button type="button" onclick="voidPolicy('${p.id}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-400 text-slate-400 rounded-lg text-[10px] transition"><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        </tr>
+      `}).join('');
+    }
+
+    function voidPolicy(id) {
+      showConfirmModal(
+        "Void Customer Policy",
+        `Are you sure you want to permanently VOID policy ${id}? This will remove it and reverse its financial impact.`,
+        () => {
+          policies = policies.filter(p => p.id !== id);
+          renderLedgerTable();
+          renderClaimsLedger();
+          renderAnalytics();
+          updatePolicyDatalist();
+          showToast(`Policy ${id} voided successfully.`, 'success');
+        }
+      );
+    }
+
+    function renderAnalytics() {
+      let gross = 0; let partsCost = 0; let deducts = 0;
+      
+      policies.forEach(p => {
+        gross += p.totalPremium;
+        p.claims.forEach(c => {
+          partsCost += c.skuCost;
+          deducts += c.deductible;
+        });
+      });
+
+      const net = (gross + deducts) - partsCost;
+      const lossRatio = gross > 0 ? (partsCost / gross) * 100 : 0;
+
+      const setSafeText = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+
+      setSafeText('kpiGrossPremium', `$${gross.toFixed(2)}`);
+      setSafeText('kpiTotalCosts', `$${partsCost.toFixed(2)}`);
+      setSafeText('kpiDeductibles', `$${deducts.toFixed(2)}`);
+      
+      const lrEl = document.getElementById('kpiLossRatio');
+      if (lrEl) {
+        lrEl.textContent = `${lossRatio.toFixed(1)}%`;
+        if (lossRatio > 60) lrEl.className = "text-3xl font-black text-rose-500";
+        else lrEl.className = "text-3xl font-black text-emerald-400";
+      }
+
+      setSafeText('acctRevenue', `$${gross.toFixed(2)}`);
+      setSafeText('acctDeduct', `$${deducts.toFixed(2)}`);
+      setSafeText('acctParts', `-$${partsCost.toFixed(2)}`);
+      setSafeText('acctNet', `$${net.toFixed(2)}`);
+    }
+
+    function viewCertificate(id) {
+      const p = policies.find(x => x.id === id);
+      if (!p) return;
+      
+      const skuObj = skus.find(s => s.model === p.deviceSku) || skus[0];
+      
+      document.getElementById('certPolicyId').textContent = p.id;
+      document.getElementById('certTermLength').textContent = `${p.termMonths} Months Coverage`;
+      document.getElementById('certDates').textContent = `${p.issueDate} to ${p.expiryDate}`;
+      document.getElementById('certCustName').textContent = p.customerName;
+      document.getElementById('certCustEmail').textContent = p.customerEmail;
+      document.getElementById('certCustPhone').textContent = p.customerPhone || 'Phone Not Provided';
+      
+      const addrList = [p.customerAddress1, p.customerAddress2, p.customerCity, p.customerProvince, p.customerPostal].filter(Boolean);
+      document.getElementById('certCustAddress').textContent = addrList.length > 0 ? addrList.join(', ') : 'Address Not Provided';
+      
+      document.getElementById('certDeviceModel').textContent = `${p.deviceBrand} ${p.deviceSku} ${p.laptopSpecs ? '(' + p.laptopSpecs + ')' : ''}`;
+      document.getElementById('certDeviceSerial').textContent = p.deviceSerial;
+      document.getElementById('certDeviceDesc').textContent = p.deviceDesc || '';
+      
+      if (p.paymentSchedule === 'monthly') {
+        const monthlyRate = (p.monthlyPayment && p.monthlyPayment > 0) ? p.monthlyPayment : (p.totalPremium / p.termMonths);
+        document.getElementById('certPremiumTotal').textContent = `$${monthlyRate.toFixed(2)}/mo ($${p.totalPremium.toFixed(2)} Total)`;
+      } else {
+        document.getElementById('certPremiumTotal').textContent = `$${p.totalPremium.toFixed(2)} UPFRONT`;
+      }
+
+      document.getElementById('certCoverageList').innerHTML = p.coverage.map(c => {
+        let cost = 0;
+        if (c.includes('Display')) cost = skuObj.screenCost;
+        if (c.includes('Battery')) cost = skuObj.batteryCost;
+        if (c.includes('Board') || c.includes('Motherboard')) cost = skuObj.boardCost;
+        if (c.includes('Chassis')) cost = skuObj.caseCost;
+        
+        return `<tr><td class="p-2 font-bold text-slate-800">${c}</td><td class="p-2 text-right font-mono text-slate-600 font-semibold">$${(cost * 3).toFixed(2)}</td><td class="p-2 text-right text-[#F58220] font-bold font-mono">$${(cost * 0.2).toFixed(2)}</td></tr>`;
+      }).join('');
+      
+      const certCouponRow = document.getElementById('certCouponRow');
+      if (p.couponValue && p.couponValue > 0) {
+        certCouponRow.classList.remove('hidden');
+        document.getElementById('certCouponName').textContent = p.couponCode || 'Discount Applied';
+        document.getElementById('certCouponAmt').textContent = `-$${p.couponValue.toFixed(2)}`;
+      } else {
+        certCouponRow.classList.add('hidden');
+      }
+
+      const claimsTbody = document.getElementById('certClaimsList');
+      if (p.claims.length === 0) {
+        claimsTbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400 italic">No historical claims recorded on this policy.</td></tr>`;
+      } else {
+        claimsTbody.innerHTML = p.claims.map(c => `
+          <tr>
+            <td class="p-2 font-mono text-slate-600">${c.date}</td>
+            <td class="p-2 font-mono font-bold text-slate-800">${c.claimId}</td>
+            <td class="p-2 font-semibold text-slate-700">${c.component}</td>
+            <td class="p-2 text-right font-bold text-[#F58220]">$${c.deductible.toFixed(2)}</td>
+          </tr>
+        `).join('');
+      }
+
+      document.getElementById('policyCertificateModal').classList.remove('hidden');
+    }
+
+    function closeCertificate() { document.getElementById('policyCertificateModal').classList.add('hidden'); }
+
+    window.onload = () => {
+      initDates();
+      populateDropdowns();
+      updatePolicyDatalist();
+      renderUnderwritingGrid();
+      renderLedgerTable();
+      renderClaimsLedger();
+      renderAnalytics();
+    };
+  </script>
+</body>
+</html>
