@@ -1023,26 +1023,42 @@
       { id: 'dlxps', type: 'Laptop', brand: 'Dell', model: 'XPS 15', screenCost: 350, batteryCost: 110, boardCost: 500, caseCost: 180 }
     ];
 
-    let policies = [
-      {
-        id: 'AMY-2026-914022', customerName: 'Navneet Gill', customerEmail: 'nav.gill@torontotech.ca', customerPhone: '(416) 555-0199',
-        customerAddress1: '68 Chesterwood Cres', customerAddress2: '#2', customerCity: 'Brampton', customerProvince: 'ON', customerPostal: 'L6Y 0Z4',
-        deviceType: 'Smartphone', deviceBrand: 'Apple', deviceSku: 'iPhone 16 Pro Max', deviceSerial: '358921098234199', deviceDesc: 'Blue Titanium, pristine', laptopSpecs: '',
-        coverage: ['Display & Glass Replacement', 'Battery Replacement'], termMonths: 24, issueDate: '2026-09-01', expiryDate: '2028-09-01', totalPremium: 397.44, paymentSchedule: 'upfront',
-        couponCode: '', couponValue: 0,
-        claims: [
-          { claimId: 'CLM-001', date: '2026-09-08', component: 'Display & Glass Replacement', skuCost: 289, deductible: 57.80, status: 'Repaired' }
-        ]
-      },
-      {
-        id: 'AMY-2026-914023', customerName: 'Sarah Connor', customerEmail: 'sconnor@cyberdyne.ca', customerPhone: '(647) 992-8833',
-        customerAddress1: '123 Skynet Way', customerAddress2: '', customerCity: 'Toronto', customerProvince: 'ON', customerPostal: 'M5V 1B4',
-        deviceType: 'Laptop', deviceBrand: 'Apple', deviceSku: 'MacBook Pro 16"', deviceSerial: 'MAC-8819203948', deviceDesc: '', laptopSpecs: 'Regular | 32GB | 1TB',
-        coverage: ['Display & Glass Replacement', 'Motherboard'], termMonths: 36, issueDate: '2026-08-15', expiryDate: '2029-08-15', totalPremium: 1910.88, paymentSchedule: 'upfront',
-        couponCode: 'WELCOME50', couponValue: 50.00,
-        claims: []
+    let policies = [];
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function savePolicy(policy) {
+      try {
+        const res = await fetch(`${getWorkerUrl()}/policies`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(policy)
+        });
+        return res.ok;
+      } catch (err) {
+        console.warn('savePolicy error:', err.message);
+        return false;
       }
-    ];
+    }
+
+    async function loadPolicies() {
+      try {
+        const res = await fetch(`${getWorkerUrl()}/policies`, { method: 'GET' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.policies)) policies = data.policies;
+      } catch (err) {
+        console.warn('loadPolicies error:', err.message);
+      }
+    }
 
     function showToast(msg, type = 'error') {
       const c = document.getElementById('toastContainer');
@@ -1050,7 +1066,7 @@
       const t = document.createElement('div');
       const isErr = type === 'error';
       t.className = `toast-enter flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border ${isErr ? 'bg-rose-950 border-rose-500/50 text-rose-200' : 'bg-emerald-950 border-emerald-500/50 text-emerald-200'} text-xs font-bold font-mono max-w-sm`;
-      t.innerHTML = `<i class="fa-solid ${isErr ? 'fa-triangle-exclamation text-rose-500' : 'fa-check-circle text-emerald-500'} text-base"></i><span>${msg}</span>`;
+      t.innerHTML = `<i class="fa-solid ${isErr ? 'fa-triangle-exclamation text-rose-500' : 'fa-check-circle text-emerald-500'} text-base"></i><span>${escapeHtml(msg)}</span>`;
       c.appendChild(t);
       setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(10px)'; setTimeout(() => t.remove(), 300); }, 3500);
     }
@@ -1298,7 +1314,7 @@
     let stripeElements = null;
     let currentPaymentIntentId = null;
 
-    async function initiateRealStripePayment(amount, description, callback) {
+    async function initiateRealStripePayment(amount, description, callback, idempotencyKey, policyId) {
       if (amount < 0.50) {
         return showToast("Transaction amount must be at least $0.50 CAD to process via Stripe.", "error");
       }
@@ -1328,10 +1344,13 @@
       document.getElementById('stripeGatewayModal').classList.remove('hidden');
 
       try {
+        const createBody = { amount: amount, currency: "cad", description: description };
+        if (idempotencyKey) createBody.idempotency_key = idempotencyKey;
+        if (policyId) createBody.policy_id = policyId;
         const response = await fetch(`${workerUrl}/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: amount, currency: "cad", description: description })
+          body: JSON.stringify(createBody)
         });
         const data = await response.json();
 
@@ -1551,7 +1570,9 @@
       initiateRealStripePayment(
         stripeChargeAmount,
         description,
-        () => finalizePolicyIssuance(newPolData)
+        () => finalizePolicyIssuance(newPolData),
+        'policy-' + newPolData.id,
+        newPolData.id
       );
     }
 
@@ -1632,6 +1653,7 @@
 
     function finalizePolicyIssuance(newPol) {
       policies.unshift(newPol);
+      savePolicy(newPol);
       confetti({ particleCount: 50, spread: 60, colors: ['#005BAC', '#F58220']});
       
       updatePolicyDatalist();
@@ -1649,7 +1671,7 @@
 
     function updatePolicyDatalist() {
       const dl = document.getElementById('policySearchList');
-      if (dl) dl.innerHTML = policies.map(p => `<option value="${p.id}">${p.customerName} - ${p.deviceBrand} ${p.deviceSku}</option>`).join('');
+      if (dl) dl.innerHTML = policies.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.customerName)} - ${escapeHtml(p.deviceBrand)} ${escapeHtml(p.deviceSku)}</option>`).join('');
     }
 
     function lookupPolicyForClaim() {
@@ -1721,12 +1743,15 @@
       initiateRealStripePayment(
         deductibleAmt,
         `Claim Deductible against ${activeClaimPolicy.id} for ${comp}`,
-        () => finalizeClaimProcessing(newClaimData) 
+        () => finalizeClaimProcessing(newClaimData),
+        'claim-' + activeClaimPolicy.id + '-' + newClaimData.claimId,
+        activeClaimPolicy.id
       );
     }
 
     function finalizeClaimProcessing(newClaim) {
       activeClaimPolicy.claims.push(newClaim);
+      savePolicy(activeClaimPolicy);
       
       document.getElementById('claimLookupId').value = '';
       document.getElementById('claimActivePolicyCard').classList.add('hidden');
@@ -1757,8 +1782,8 @@
             <div class="text-[10px] text-slate-500">${ac.claim.date}</div>
           </td>
           <td class="p-3">
-            <div class="text-[#005BAC] font-bold cursor-pointer hover:underline" onclick="switchTab('ledger', '${ac.policy.id}')">${ac.policy.id}</div>
-            <div class="text-[10px] text-slate-400">${ac.policy.customerName}</div>
+            <div class="text-[#005BAC] font-bold cursor-pointer hover:underline" onclick="switchTab('ledger', '${escapeHtml(ac.policy.id)}')">${escapeHtml(ac.policy.id)}</div>
+            <div class="text-[10px] text-slate-400">${escapeHtml(ac.policy.customerName)}</div>
           </td>
           <td class="p-3 text-slate-300 text-[10px]">${ac.claim.component}</td>
           <td class="p-3 text-right font-bold text-[#F58220]">$${ac.claim.deductible.toFixed(2)}</td>
@@ -1903,29 +1928,36 @@
       }
 
       tbody.innerHTML = filtered.map(p => {
+        const e = escapeHtml;
         const claimBadge = p.claims.length > 0 
           ? `<span class="px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 text-[10px] border border-rose-500/20 font-bold">${p.claims.length} Claim(s)</span>`
           : `<span class="text-[10px] text-slate-500">Zero Claims</span>`;
 
+        const status = p.paymentStatus || 'pending';
+        const statusBadge = status === 'paid'
+          ? `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20 font-bold">Paid</span>`
+          : `<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] border border-amber-500/20 font-bold">Pending</span>`;
+
         return `
         <tr class="hover:bg-slate-800/40">
           <td class="p-3 pl-4">
-            <div class="font-bold text-[#005BAC] cursor-pointer hover:underline" onclick="switchTab('claims', '${p.id}')">${p.id}</div>
-            <div class="text-[9px] text-slate-500">${p.issueDate} to ${p.expiryDate}</div>
+            <div class="font-bold text-[#005BAC] cursor-pointer hover:underline" onclick="switchTab('claims', '${e(p.id)}')">${e(p.id)}</div>
+            <div class="text-[9px] text-slate-500">${e(p.issueDate)} to ${e(p.expiryDate)}</div>
           </td>
           <td class="p-3">
-            <div class="font-bold text-white">${p.customerName}</div>
-            <div class="text-[9px] text-slate-400">${p.customerEmail} | ${p.customerPhone || ''}</div>
+            <div class="font-bold text-white">${e(p.customerName)}</div>
+            <div class="text-[9px] text-slate-400">${e(p.customerEmail)} | ${e(p.customerPhone || '')}</div>
           </td>
           <td class="p-3">
-            <div class="text-slate-300 text-[11px] font-bold">${p.deviceBrand} ${p.deviceSku}</div>
-            <div class="text-[10px] text-slate-500 font-mono">${p.deviceSerial}</div>
+            <div class="text-slate-300 text-[11px] font-bold">${e(p.deviceBrand)} ${e(p.deviceSku)}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${e(p.deviceSerial)}</div>
           </td>
           <td class="p-3 text-center">${claimBadge}</td>
-          <td class="p-3 text-right font-bold text-emerald-400">$${p.totalPremium.toFixed(2)}<div class="text-[9px] text-slate-500 uppercase">${p.paymentSchedule}</div></td>
+          <td class="p-3 text-right font-bold text-emerald-400">$${p.totalPremium.toFixed(2)}<div class="text-[9px] text-slate-500 uppercase">${e(p.paymentSchedule)}</div></td>
+          <td class="p-3 text-center">${statusBadge}</td>
           <td class="p-3 text-center flex justify-center gap-2">
-            <button type="button" onclick="viewCertificate('${p.id}')" class="px-2.5 py-1.5 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-lg text-[10px] transition font-bold"><i class="fa-solid fa-file-invoice"></i> Cert</button>
-            <button type="button" onclick="voidPolicy('${p.id}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-400 text-slate-400 rounded-lg text-[10px] transition"><i class="fa-solid fa-trash-can"></i></button>
+            <button type="button" onclick="viewCertificate('${e(p.id)}')" class="px-2.5 py-1.5 bg-[#005BAC] hover:bg-[#004C91] text-white rounded-lg text-[10px] transition font-bold"><i class="fa-solid fa-file-invoice"></i> Cert</button>
+            <button type="button" onclick="voidPolicy('${e(p.id)}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-rose-900/50 hover:text-rose-400 text-slate-400 rounded-lg text-[10px] transition"><i class="fa-solid fa-trash-can"></i></button>
           </td>
         </tr>
       `}).join('');
@@ -1937,6 +1969,7 @@
         `Are you sure you want to permanently VOID policy ${id}? This will remove it and reverse its financial impact.`,
         () => {
           policies = policies.filter(p => p.id !== id);
+          fetch(`${getWorkerUrl()}/policies/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
           renderLedgerTable();
           renderClaimsLedger();
           renderAnalytics();
@@ -2159,7 +2192,8 @@
       });
     })();
 
-    window.onload = () => {
+    window.onload = async () => {
+      await loadPolicies();
       initDates();
       populateDropdowns();
       updatePolicyDatalist();
