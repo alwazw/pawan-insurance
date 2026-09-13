@@ -389,16 +389,11 @@
           <!-- Payment Options -->
           <div class="pt-2 space-y-3">
             <button type="submit" class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg transition flex items-center justify-center space-x-2">
-              <i class="fa-solid fa-credit-card text-base"></i><span>Charge Card Now (Manual Entry)</span>
+              <i class="fa-solid fa-credit-card text-base"></i><span>Charge Card Now</span>
             </button>
-            <div class="grid grid-cols-2 gap-2">
-              <button type="button" id="sendLinkBtn" onclick="sendPaymentLink()" class="py-3 px-3 bg-[#635BFF] hover:bg-[#4a50d6] text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
-                <i class="fa-solid fa-link"></i><span>Send Payment Link</span>
-              </button>
-              <button type="button" onclick="showTapToPayInfo()" class="py-3 px-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center space-x-1.5">
-                <i class="fa-solid fa-mobile-screen"></i><span>Tap to Pay</span>
-              </button>
-            </div>
+            <button type="button" id="sendLinkBtn" onclick="sendPaymentLink()" class="w-full py-3 px-4 bg-[#635BFF] hover:bg-[#4a50d6] text-white rounded-xl text-sm font-bold transition flex items-center justify-center space-x-1.5">
+              <i class="fa-solid fa-link"></i><span>Send Payment Link to Customer</span>
+            </button>
           </div>
         </form>
       </div>
