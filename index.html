@@ -733,8 +733,8 @@
 
   <!-- LIVE STRIPE API MODAL -->
   <div id="stripeGatewayModal" class="fixed inset-0 z-[110] bg-[#0B111E]/90 backdrop-blur-md hidden flex items-center justify-center p-4 transition-opacity">
-    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative">
-      <div class="bg-[#635BFF] p-6 text-center text-white relative">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden relative flex flex-col max-h-[90vh]">
+      <div class="bg-[#635BFF] p-6 text-center text-white relative shrink-0">
         <div class="absolute top-4 right-4">
           <button type="button" onclick="cancelPayment()" class="text-white/70 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
         </div>
@@ -742,7 +742,7 @@
         <h3 class="text-sm font-medium opacity-90 tracking-wide">Secure API Gateway</h3>
       </div>
       
-      <div class="p-6 sm:p-8 space-y-5">
+      <div class="p-6 sm:p-8 space-y-5 overflow-y-auto">
         <div class="text-center space-y-1">
           <p class="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono" id="stripeTxType">Policy Premium</p>
           <div class="text-4xl font-black text-slate-900 font-mono" id="stripeTxAmount">$0.00</div>
