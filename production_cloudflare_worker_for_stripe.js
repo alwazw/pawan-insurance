@@ -189,7 +189,119 @@ export default {
       }
     }
 
-    return new Response(JSON.stringify({ error: "Route not found. Use POST /create, POST /cancel, or GET /check?id=" }), {
+    if (path === "/email" && request.method === "POST") {
+      try {
+        if (!env.BREVO_API_KEY) {
+          return new Response(JSON.stringify({
+            error: "BREVO_API_KEY is not configured on this Worker. Add it as a secret binding to enable email."
+          }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+        }
+
+        const body = await request.json();
+        const to = body.to;
+        const subject = body.subject || "Amy Wireless Care+";
+        const html = body.html;
+
+        if (!to || !html) {
+          return new Response(JSON.stringify({ error: "Missing 'to' or 'html' in request body" }), {
+            status: 400, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        const senderEmail = env.BREVO_SENDER_EMAIL || "noreply@amywireless.ca";
+        const ccEmail = env.BREVO_CC_EMAIL || "warranty@amywireless.ca";
+
+        const emailPayload = {
+          sender: { name: "Amy Wireless Care+", email: senderEmail },
+          to: [{ email: to }],
+          cc: [{ email: ccEmail }],
+          subject: subject,
+          htmlContent: html,
+        };
+
+        const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": env.BREVO_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        });
+        const brevoData = await brevoRes.json().catch(() => ({}));
+
+        if (!brevoRes.ok) {
+          return new Response(JSON.stringify({ error: brevoData.message || `Brevo rejected (HTTP ${brevoRes.status})` }), {
+            status: brevoRes.status, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          status: "sent",
+          messageId: brevoData.messageId || null,
+          to: to,
+          cc: ccEmail
+        }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500, headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+    }
+
+    if (path === "/payment-link" && request.method === "POST") {
+      try {
+        const body = await request.json();
+        const amount = parseFloat(body.amount);
+        const description = body.description || "Amy Wireless Care+ Policy";
+
+        if (isNaN(amount) || amount < 0.50) {
+          return new Response(JSON.stringify({ error: "Amount must be at least $0.50 CAD" }), {
+            status: 400, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        const amountInCents = Math.round(amount * 100);
+        const params = new URLSearchParams({
+          "line_items[0][price_data][currency]": "cad",
+          "line_items[0][price_data][unit_amount]": amountInCents.toString(),
+          "line_items[0][price_data][product_data][name]": description,
+          "line_items[0][quantity]": "1",
+        });
+        if (body.metadata) {
+          Object.entries(body.metadata).forEach(([k, v]) => {
+            params.append(`metadata[${k}]`, String(v));
+          });
+        }
+
+        const stripeRes = await fetch("https://api.stripe.com/v1/payment_links", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${env.STRIPE_SECRET_KEY}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params,
+        });
+        const stripeData = await stripeRes.json();
+
+        if (!stripeRes.ok) {
+          return new Response(JSON.stringify({ error: stripeData.error?.message || "Stripe rejected payment link" }), {
+            status: stripeRes.status, headers: { "Content-Type": "application/json", ...corsHeaders }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          paymentLinkId: stripeData.id,
+          url: stripeData.url,
+          active: stripeData.active
+        }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500, headers: { "Content-Type": "application/json", ...corsHeaders }
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ error: "Route not found. Use POST /create, POST /cancel, POST /email, POST /payment-link, or GET /check?id=" }), {
       status: 404, headers: { "Content-Type": "application/json", ...corsHeaders }
     });
   }
