@@ -17,7 +17,11 @@ export default {
     }
 
     const url = new URL(request.url);
-    const path = url.pathname.replace(/\/$/, "");
+    let path = url.pathname.replace(/\/$/, "");
+    // Support same-origin routing under a custom domain prefix (e.g. /api/create)
+    if (path.startsWith("/api")) {
+      path = path.slice(4);
+    }
 
     if (path === "/health" || path === "/ping") {
       if (!env.STRIPE_SECRET_KEY) {
