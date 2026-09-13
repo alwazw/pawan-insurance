@@ -208,11 +208,12 @@ export default {
           });
         }
 
-        const senderEmail = env.BREVO_SENDER_EMAIL || "noreply@amywireless.ca";
+        const senderEmail = env.BREVO_SENDER_EMAIL || "warranty@amywireless.ca";
+        const senderName = env.BREVO_SENDER_NAME || "Amy Wireless Care+";
         const ccEmail = env.BREVO_CC_EMAIL || "warranty@amywireless.ca";
 
         const emailPayload = {
-          sender: { name: "Amy Wireless Care+", email: senderEmail },
+          sender: { name: senderName, email: senderEmail },
           to: [{ email: to }],
           cc: [{ email: ccEmail }],
           subject: subject,
