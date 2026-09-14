@@ -380,7 +380,7 @@
             <div>
               <label class="block text-[11px] font-mono uppercase tracking-wider text-slate-400 font-bold mb-2">6. Billing</label>
               <div class="grid grid-cols-2 gap-2">
-                <button type="button" id="payTypeUpfront" onclick="setPaymentSchedule('upfront')" class="py-2.5 px-3 rounded-xl text-xs font-bold border border-[#F58220] bg-[#F58220] text-white transition shadow-lg shadow-[#F58220]/20">Upfront (Save 10%)</button>
+                <button type="button" id="payTypeUpfront" onclick="setPaymentSchedule('upfront')" class="py-2.5 px-3 rounded-xl text-xs font-bold border border-[#F58220] bg-[#F58220] text-white transition shadow-lg shadow-[#F58220]/20">Upfront</button>
                 <button type="button" id="payTypeMonthly" onclick="setPaymentSchedule('monthly')" class="py-2.5 px-3 rounded-xl text-xs font-bold border border-[#005BAC] bg-[#005BAC] text-white transition opacity-60 hover:opacity-100">Monthly</button>
               </div>
             </div>
@@ -1230,11 +1230,11 @@
           upfrontDiscountValue = 0;
           currentQuoteState.unadjustedTotal = (yearlyPremium / 12.0) * term;
         } else {
-          // UPFRONT: prorated by term, with 10% upfront discount
+          // UPFRONT: total contract value, no discount (per spec)
           const upfrontBase = contractValue * (term / 12.0);
           currentQuoteState.unadjustedTotal = yearlyPremium * (term / 12.0);
-          upfrontDiscountValue = upfrontBase * 0.10;
-          finalTotalPremium = Math.max(0, upfrontBase - upfrontDiscountValue);
+          upfrontDiscountValue = 0;
+          finalTotalPremium = Math.max(0, upfrontBase);
           monthlyPayment = 0;
         }
         currentQuoteState.discountVal = upfrontDiscountValue;
@@ -1262,9 +1262,6 @@
         if (paymentSchedule === 'upfront') {
           if (currentQuoteState.couponVal > 0) {
             cornerHTML += `<div class="text-rose-400 mb-0.5"><span class="uppercase">${couponCode || 'Coupon'}</span>: -$${currentQuoteState.couponVal.toFixed(2)}</div>`;
-          }
-          if (currentQuoteState.discountVal > 0) {
-            cornerHTML += `<div class="text-[#F58220]">10% Upfront Savings: -$${currentQuoteState.discountVal.toFixed(2)}</div>`;
           }
         } else {
           if (currentQuoteState.couponVal > 0) {
