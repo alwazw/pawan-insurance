@@ -1005,6 +1005,8 @@
       unadjustedTotal: 0,
       discountVal: 0,
       couponVal: 0,
+      contractValue: 0,
+      yearlyPremium: 0,
       finalTotalPremium: 0,
       monthlyPayment: 0,
       isOverridden: false
@@ -1214,21 +1216,22 @@
         currentQuoteState.couponVal = 0;
         currentQuoteState.discountVal = 0;
       } else {
+        // Coupon applied to yearly base rate
+        const contractValue = Math.max(0, yearlyPremium - couponVal);
+        currentQuoteState.contractValue = contractValue;
+
         if (paymentSchedule === 'monthly') {
-          // STRICT RULE: MONTHLY PREMIUM = YEARLY PREMIUM / 12
-          const baseMonthly = yearlyPremium / 12.0;
-          // Coupon applies directly as flat reduction to monthly payment
-          monthlyPayment = Math.max(0, baseMonthly - couponVal);
+          // Monthly = (contract + 10% subscription fee) / 12 annualized
+          monthlyPayment = Math.max(0, (contractValue * 1.10) / 12.0);
           finalTotalPremium = monthlyPayment * term;
           upfrontDiscountValue = 0;
-          currentQuoteState.unadjustedTotal = baseMonthly * term;
+          currentQuoteState.unadjustedTotal = (yearlyPremium / 12.0) * term;
         } else {
-          // UPFRONT: Prorated by term (Yearly * Term / 12)
-          const unadjustedTotal = yearlyPremium * (term / 12.0);
-          currentQuoteState.unadjustedTotal = unadjustedTotal;
-          const postCouponTotal = Math.max(0, unadjustedTotal - couponVal);
-          upfrontDiscountValue = postCouponTotal * 0.10;
-          finalTotalPremium = Math.max(0, postCouponTotal - upfrontDiscountValue);
+          // UPFRONT: prorated by term, with 10% upfront discount
+          const upfrontBase = contractValue * (term / 12.0);
+          currentQuoteState.unadjustedTotal = yearlyPremium * (term / 12.0);
+          upfrontDiscountValue = upfrontBase * 0.10;
+          finalTotalPremium = Math.max(0, upfrontBase - upfrontDiscountValue);
           monthlyPayment = 0;
         }
         currentQuoteState.discountVal = upfrontDiscountValue;
@@ -1282,6 +1285,8 @@
         <div class="flex justify-between items-center"><span class="font-bold text-white">Term Duration:</span><span class="font-mono text-white font-bold bg-[#F58220] px-2 rounded">${term} Months</span></div>
         <div class="flex justify-between mt-2"><span class="text-slate-400">Total Coverage:</span><span class="font-mono text-emerald-400 font-bold">$${totalMaxCov.toFixed(2)}</span></div>
         <div class="flex justify-between mt-2"><span class="text-slate-400">Yearly Base Rate:</span><span class="font-mono text-slate-300 font-bold">$${currentQuoteState.yearlyPremium.toFixed(2)}/yr</span></div>
+        <div class="flex justify-between mt-2"><span class="text-slate-400">Contract Value (after coupon):</span><span class="font-mono text-white font-bold">$${currentQuoteState.contractValue.toFixed(2)}</span></div>
+        ${paymentSchedule === 'monthly' ? `<div class="flex justify-between mt-2"><span class="text-slate-400">Subscription Fee (10%):</span><span class="font-mono text-slate-300 font-bold">$${(currentQuoteState.contractValue * 0.10).toFixed(2)}</span></div>` : ''}
         <div class="flex justify-between mt-2"><span class="text-slate-400">Total Contract Value:</span><span class="font-mono text-white font-bold">$${currentQuoteState.finalTotalPremium.toFixed(2)}</span></div>
       `;
       document.getElementById('quoteLineItems').innerHTML = lineItemsHTML;
@@ -1546,6 +1551,9 @@
         issueDate: document.getElementById('issueDate').value,
         expiryDate: document.getElementById('expiryDate').value,
         paymentSchedule: paymentSchedule,
+        contractValue: currentQuoteState.contractValue,
+        subscriptionFee: paymentSchedule === 'monthly' ? currentQuoteState.contractValue * 0.10 : 0,
+        paidMonths: paymentSchedule === 'upfront' ? term : 0,
         claims: []
       };
 
@@ -1716,7 +1724,8 @@
       if (!comp) return showToast("Please select a valid component.");
       if (!activeClaimPolicy.coverage.includes(comp)) return showToast(`DENIED: Policy lacks scope for [${comp}].`);
 
-      const skuObj = skus.find(s => s.model === activeClaimPolicy.deviceSku) || skus[0];
+      const p = activeClaimPolicy;
+      const skuObj = skus.find(s => s.model === p.deviceSku) || skus[0];
       let rawCost = 0;
       if (comp.includes('Display')) rawCost = skuObj.screenCost;
       if (comp.includes('Battery')) rawCost = skuObj.batteryCost;
@@ -1724,6 +1733,21 @@
       if (comp.includes('Chassis')) rawCost = skuObj.caseCost;
       
       const deductibleAmt = rawCost * 0.20;
+
+      // --- Claim settlement: prior months must be paid ---
+      const term = p.termMonths || 12;
+      const paidMonths = p.paidMonths || 0;
+      const isMonthly = p.paymentSchedule === 'monthly';
+
+      // Monthly policies: reject if no months have been paid yet
+      if (isMonthly && paidMonths <= 0) {
+        return showToast("CLAIM BLOCKED: No monthly payments recorded. Prior months must be paid before a claim is allowed.", "error");
+      }
+
+      // Remaining contract months + deductible
+      const remainingMonths = Math.max(0, term - paidMonths);
+      const remainingContractPayment = (p.monthlyPayment || 0) * remainingMonths;
+      const settlementAmt = remainingContractPayment + deductibleAmt;
 
       const newClaimData = {
         claimId: `CLM-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1734,18 +1758,20 @@
         status: 'Repaired'
       };
 
-      document.getElementById('stripeTxType').textContent = 'Repair Deductible';
+      document.getElementById('stripeTxType').textContent = isMonthly ? 'Claim Settlement (Remaining + Deductible)' : 'Repair Deductible';
       initiateRealStripePayment(
-        deductibleAmt,
-        `Claim Deductible against ${activeClaimPolicy.id} for ${comp}`,
+        settlementAmt,
+        `Claim settlement against ${p.id} for ${comp}`,
         () => finalizeClaimProcessing(newClaimData),
-        'claim-' + activeClaimPolicy.id + '-' + newClaimData.claimId,
-        activeClaimPolicy.id
+        'claim-' + p.id + '-' + newClaimData.claimId,
+        p.id
       );
     }
 
     function finalizeClaimProcessing(newClaim) {
       activeClaimPolicy.claims.push(newClaim);
+      // Claim settlement clears the remaining contract — mark fully paid
+      activeClaimPolicy.paidMonths = activeClaimPolicy.termMonths;
       savePolicy(activeClaimPolicy);
       
       document.getElementById('claimLookupId').value = '';
