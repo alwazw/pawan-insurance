@@ -81,11 +81,31 @@ async function upsertPolicy(env, p, operator) {
   ).run();
 }
 
-async function markPolicyPaid(env, policyId, reference) {
-  const res = await env.DB.prepare(
-    "UPDATE policies SET payment_status = 'paid', payment_intent_id = COALESCE(payment_intent_id, ?) WHERE id = ?"
-  ).bind(reference || null, policyId).run();
-  return res.meta?.changes || 0;
+async function recordStripePayment(env, policyId, payment) {
+  const row = await env.DB.prepare(
+    "SELECT data, payment_status FROM policies WHERE id = ?"
+  ).bind(policyId).first();
+
+  if (!row) return 0;
+
+  let p = {};
+  try { p = JSON.parse(row.data || "{}"); } catch { p = {}; }
+
+  if (!Array.isArray(p.payments)) p.payments = [];
+  p.payments.push({
+    date: new Date().toISOString().split("T")[0],
+    amount: payment.amount || 0,
+    status: "paid",
+    source: "stripe",
+    txnId: payment.txnId || null
+  });
+  p.paymentStatus = "paid";
+
+  await env.DB.prepare(
+    "UPDATE policies SET payment_status = 'paid', payment_intent_id = COALESCE(payment_intent_id, ?), data = ? WHERE id = ?"
+  ).bind(payment.txnId || null, JSON.stringify(p), policyId).run();
+
+  return 1;
 }
 
 async function verifyStripeSignature(rawBody, signature, secret) {
@@ -213,10 +233,14 @@ export default {
 
       if (event.type === "checkout.session.completed" || event.type === "payment_intent.succeeded") {
         if (!policyId) {
-          return json({ received: true, note: "no policy_id in metadata" }, 200, cors);
+          return json({ received: true, note: "no policy_id in metadata — event skipped" }, 200, cors);
         }
-        const changes = await markPolicyPaid(env, policyId, obj.payment_intent || obj.id || null);
-        return json({ received: true, policyId, updated: changes }, 200, cors);
+        const amount = obj.amount_received
+          ? obj.amount_received / 100
+          : obj.amount_total / 100 || 0;
+        const txnId = obj.payment_intent || obj.id || null;
+        await recordStripePayment(env, policyId, { amount, txnId });
+        return json({ received: true, policyId, status: "paid" }, 200, cors);
       }
 
       // Acknowledge other events so Stripe doesn't retry

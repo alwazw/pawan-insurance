@@ -561,6 +561,7 @@
               <th class="p-3">Device & Details</th>
               <th class="p-3 text-center">Claims</th>
               <th class="p-3 text-right">Premium</th>
+              <th class="p-3 text-center">Status</th>
               <th class="p-3 text-center">Actions</th>
             </tr>
           </thead>
@@ -627,6 +628,45 @@
       </div>
     </section>
   </main>
+
+  <!-- PAYMENT SCHEDULE & HISTORY MODAL -->
+  <div id="paymentHistoryModal" class="fixed inset-0 z-[105] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#111927] border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900 shrink-0">
+        <h3 class="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-receipt text-[#005BAC]"></i>
+          <span>Payment Schedule &amp; History</span>
+        </h3>
+        <button type="button" onclick="closePaymentHistory()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-5 overflow-y-auto">
+        <div class="text-xs text-slate-400 mb-2">
+          <span class="text-white font-bold font-mono" id="payHistPolicyId">—</span> ·
+          <span id="payHistCustomer">—</span> ·
+          <span id="payHistSchedule" class="uppercase font-mono">—</span>
+        </div>
+        <div id="payHistSummary" class="mb-3 text-[11px] font-mono text-slate-300"></div>
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-900 text-slate-400 font-mono text-[10px] uppercase">
+            <tr>
+              <th class="p-2">Period</th>
+              <th class="p-2">Date</th>
+              <th class="p-2 text-right">Amount</th>
+              <th class="p-2 text-center">Status</th>
+              <th class="p-2">Source / Ref</th>
+            </tr>
+          </thead>
+          <tbody id="payHistBody" class="divide-y divide-slate-800 font-mono text-slate-200"></tbody>
+        </table>
+        <div class="pt-4 border-t border-slate-800 mt-4 flex items-center justify-between gap-3">
+          <span class="text-[10px] text-slate-500 leading-tight">Payments taken outside the platform (mobile tap-to-pay) can be recorded manually here. Stripe payments automatically link via policy metadata + webhook.</span>
+          <button type="button" id="recordPaymentBtn" onclick="recordManualPayment()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shrink-0">
+            <i class="fa-solid fa-circle-check"></i><span>Record Payment</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- POLICY CERTIFICATE MODAL -->
   <div id="policyCertificateModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
@@ -1002,6 +1042,7 @@
     let pollingInterval = null;
     let pendingTransaction = null;
     let currentCertificateId = null;
+    let currentPaymentHistoryId = null;
 
     let currentQuoteState = {
       basePremium12: 0,
@@ -1655,10 +1696,32 @@
     }
 
     function finalizePolicyIssuance(newPol) {
-      // For a monthly policy, the just-collected payment is month 1 — record it
+      // Record the just-collected payment in the payment history
+      if (!Array.isArray(newPol.payments)) newPol.payments = [];
       if (newPol.paymentSchedule === 'monthly') {
+        // For a monthly policy, the just-collected payment is month 1 — record it
         newPol.paidMonths = Math.max(1, newPol.paidMonths || 0);
+        newPol.payments.push({
+          month: 1,
+          date: new Date().toISOString().split('T')[0],
+          amount: newPol.monthlyPayment || 0,
+          status: 'paid',
+          source: 'stripe',
+          txnId: null
+        });
+      } else {
+        // Upfront: single settled payment
+        newPol.paidMonths = newPol.termMonths || 12;
+        newPol.payments.push({
+          month: 1,
+          date: new Date().toISOString().split('T')[0],
+          amount: newPol.totalPremium || 0,
+          status: 'paid',
+          source: 'stripe',
+          txnId: null
+        });
       }
+      newPol.paymentStatus = 'paid';
       policies.unshift(newPol);
       savePolicy(newPol);
       confetti({ particleCount: 50, spread: 60, colors: ['#005BAC', '#F58220']});
@@ -1959,9 +2022,11 @@
           : `<span class="text-[10px] text-slate-500">Zero Claims</span>`;
 
         const status = p.paymentStatus || 'pending';
-        const statusBadge = status === 'paid'
-          ? `<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20 font-bold">Paid</span>`
-          : `<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] border border-amber-500/20 font-bold">Pending</span>`;
+        const statusLabel = status === 'paid' ? 'Paid' : (status === 'active' ? 'Active' : 'Pending');
+        const statusColor = status === 'paid' || status === 'active'
+          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+          : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+        const statusBadge = `<a href="#" onclick="openPaymentHistory('${e(p.id)}');return false;" class="inline-block px-2 py-0.5 rounded ${statusColor} text-[10px] border font-bold hover:underline cursor-pointer" title="View payment history">${statusLabel}</a>`;
 
         return `
         <tr class="hover:bg-slate-800/40">
@@ -2195,21 +2260,139 @@
       if (paidMonths >= term) return showToast('All months are already paid.', 'error');
 
       const monthlyAmt = p.monthlyPayment || (p.totalPremium / term);
-      document.getElementById('stripeTxType').textContent = `Monthly Payment (Month ${paidMonths + 1} of ${term})`;
+      const monthNum = paidMonths + 1;
+      document.getElementById('stripeTxType').textContent = `Monthly Payment (Month ${monthNum} of ${term})`;
       initiateRealStripePayment(
         monthlyAmt,
         `Monthly premium against ${p.id}`,
         () => {
-          p.paidMonths = (p.paidMonths || 0) + 1;
+          if (!Array.isArray(p.payments)) p.payments = [];
+          p.payments.push({ month: monthNum, date: new Date().toISOString().split('T')[0], amount: monthlyAmt, status: 'paid', source: 'stripe', txnId: null });
+          p.paidMonths = monthNum;
+          if (p.paymentStatus !== 'paid') p.paymentStatus = 'paid';
           savePolicy(p);
           renderLedgerTable();
           renderAnalytics();
           viewCertificate(p.id);
-          showToast(`Month ${p.paidMonths}/${term} collected.`, 'success');
+          showToast(`Month ${monthNum}/${term} collected.`, 'success');
         },
-        'monthly-' + p.id + '-' + (paidMonths + 1),
+        'monthly-' + p.id + '-' + monthNum,
         p.id
       );
+    }
+
+    function openPaymentHistory(id) {
+      const p = policies.find(x => x.id === id);
+      if (!p) return;
+      currentPaymentHistoryId = id;
+      renderPaymentHistory();
+      document.getElementById('paymentHistoryModal').classList.remove('hidden');
+    }
+
+    function closePaymentHistory() {
+      document.getElementById('paymentHistoryModal').classList.add('hidden');
+      currentPaymentHistoryId = null;
+    }
+
+    function renderPaymentHistory() {
+      const p = policies.find(x => x.id === currentPaymentHistoryId);
+      if (!p) return;
+      const e = escapeHtml;
+      document.getElementById('payHistPolicyId').textContent = p.id;
+      document.getElementById('payHistCustomer').textContent = (p.customerName || '—') + ' · ' + (p.customerEmail || '');
+      document.getElementById('payHistSchedule').textContent = p.paymentSchedule === 'monthly' ? 'Monthly plan' : 'Upfront plan';
+
+      const term = p.termMonths || 12;
+      const paidMonths = p.paidMonths || 0;
+      const payments = Array.isArray(p.payments) ? p.payments : [];
+      const totalPaid = payments.filter(x => x.status === 'paid').reduce((s, x) => s + (Number(x.amount) || 0), 0);
+
+      const btn = document.getElementById('recordPaymentBtn');
+      let rows = '';
+
+      if (p.paymentSchedule === 'monthly') {
+        for (let m = 1; m <= term; m++) {
+          const pay = payments.find(x => Number(x.month) === m);
+          const isPaid = Boolean(pay && pay.status === 'paid');
+          const date = pay ? pay.date : '—';
+          const src = pay ? (pay.source + (pay.txnId ? ' · ' + pay.txnId.slice(0, 12) + '…' : '')) : '—';
+          const amount = pay ? pay.amount : (p.monthlyPayment || (p.totalPremium / term));
+          rows += `<tr class="hover:bg-slate-800/40">
+            <td class="p-2 font-bold text-white">Month ${m}</td>
+            <td class="p-2 text-slate-400">${e(String(date))}</td>
+            <td class="p-2 text-right font-mono text-slate-200">$${Number(amount).toFixed(2)}</td>
+            <td class="p-2 text-center">${isPaid ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20 font-bold">Paid</span>' : '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] border border-amber-500/20 font-bold">' + (m === paidMonths + 1 ? 'Due' : 'Pending') + '</span>'}</td>
+            <td class="p-2 text-slate-500">${e(String(src || '—'))}</td>
+          </tr>`;
+        }
+        document.getElementById('payHistSummary').textContent = `${paidMonths}/${term} months paid · $${totalPaid.toFixed(2)} collected so far`;
+        if (btn) btn.classList.toggle('hidden', paidMonths >= term);
+      } else {
+        const pay = payments.find(x => x.status === 'paid');
+        const isPaid = Boolean(pay) || p.paymentStatus === 'paid' || paidMonths >= term;
+        const amount = pay ? pay.amount : (p.totalPremium || 0);
+        const date = pay ? pay.date : '—';
+        const src = pay ? (pay.source + (pay.txnId ? ' · ' + pay.txnId.slice(0, 12) + '…' : '')) : '—';
+        rows = `<tr class="hover:bg-slate-800/40">
+          <td class="p-2 font-bold text-white">Upfront Premium</td>
+          <td class="p-2 text-slate-400">${e(String(date))}</td>
+          <td class="p-2 text-right font-mono text-slate-200">$${Number(amount).toFixed(2)}</td>
+          <td class="p-2 text-center">${isPaid ? '<span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20 font-bold">Paid</span>' : '<span class="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 text-[10px] border border-amber-500/20 font-bold">Pending</span>'}</td>
+          <td class="p-2 text-slate-500">${e(String(src || '—'))}</td>
+        </tr>`;
+        document.getElementById('payHistSummary').textContent = isPaid ? 'Fully settled' : 'Payment not yet received';
+        if (btn) btn.classList.toggle('hidden', isPaid);
+      }
+
+      document.getElementById('payHistBody').innerHTML = rows;
+    }
+
+    function recordManualPayment() {
+      const p = policies.find(x => x.id === currentPaymentHistoryId);
+      if (!p) return;
+      const term = p.termMonths || 12;
+      const paidMonths = p.paidMonths || 0;
+      const isMonthly = p.paymentSchedule === 'monthly';
+
+      if (isMonthly && paidMonths >= term) return showToast('All months are already paid.', 'error');
+      if (!isMonthly && (p.paymentStatus === 'paid' || p.paymentStatus === 'active')) return showToast('Policy already paid.', 'error');
+
+      const amount = isMonthly ? (p.monthlyPayment || (p.totalPremium / term)) : (p.totalPremium || p.monthlyPayment || 0);
+      const monthNum = isMonthly ? paidMonths + 1 : 1;
+      const wasPending = !p.paymentStatus || p.paymentStatus === 'pending' || p.paymentStatus === 'not_initialized';
+
+      if (!Array.isArray(p.payments)) p.payments = [];
+      p.payments.push({
+        month: monthNum,
+        date: new Date().toISOString().split('T')[0],
+        amount: Number(amount),
+        status: 'paid',
+        source: 'manual',
+        txnId: null
+      });
+
+      if (isMonthly) p.paidMonths = monthNum; else p.paidMonths = term;
+      p.paymentStatus = 'paid';
+
+      savePolicy(p);
+      renderLedgerTable();
+      renderPaymentHistory();
+      showToast(isMonthly ? `Month ${monthNum}/${term} recorded as paid (manual).` : 'Upfront payment recorded as paid (manual).', 'success');
+
+      // First payment → policy goes live: email the customer a copy of the policy
+      if (wasPending && p.customerEmail && p.customerEmail.includes('@')) {
+        const workerUrl = getWorkerUrl();
+        fetch(`${workerUrl}/email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: p.customerEmail,
+            subject: `Your Amy Wireless Care+ Policy & Receipt — ${p.id}`,
+            html: buildPolicyEmailHtml(p)
+          })
+        }).then(() => showToast(`Policy activated and emailed to ${p.customerEmail}`, 'success'))
+          .catch(() => showToast('Payment recorded, but policy email failed to send.', 'error'));
+      }
     }
 
     // ---- Stripe redirect-return handler (3D Secure / SCA) ----
