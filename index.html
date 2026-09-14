@@ -634,6 +634,9 @@
       <div class="no-print flex justify-between items-center border-b border-slate-200 pb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">Official Certificate Preview</span>
         <div class="flex items-center space-x-2">
+          <button type="button" id="collectMonthlyBtn" onclick="collectMonthlyPayment()" class="hidden px-3 py-1.5 bg-[#F58220] hover:bg-[#E06F0F] text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5">
+            <i class="fa-solid fa-coins"></i><span>Collect Monthly Payment</span>
+          </button>
           <button type="button" onclick="emailPolicyDocument()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5">
             <i class="fa-solid fa-envelope"></i><span>Email Document</span>
           </button>
@@ -1655,6 +1658,10 @@
     }
 
     function finalizePolicyIssuance(newPol) {
+      // For a monthly policy, the just-collected payment is month 1 — record it
+      if (newPol.paymentSchedule === 'monthly') {
+        newPol.paidMonths = Math.max(1, newPol.paidMonths || 0);
+      }
       policies.unshift(newPol);
       savePolicy(newPol);
       confetti({ particleCount: 50, spread: 60, colors: ['#005BAC', '#F58220']});
@@ -2040,6 +2047,17 @@
       const p = policies.find(x => x.id === id);
       if (!p) return;
       currentCertificateId = id;
+
+      // Show "Collect Monthly Payment" for monthly policies with unpaid months
+      const monthlyBtn = document.getElementById('collectMonthlyBtn');
+      if (monthlyBtn) {
+        const paidMonths = p.paidMonths || 0;
+        const unpaid = (p.paymentSchedule === 'monthly') && (paidMonths < (p.termMonths || 12));
+        monthlyBtn.classList.toggle('hidden', !unpaid);
+        if (unpaid) {
+          monthlyBtn.innerHTML = `<i class="fa-solid fa-coins"></i><span>Collect Monthly Payment (${paidMonths}/${p.termMonths} paid)</span>`;
+        }
+      }
       
       const skuObj = skus.find(s => s.model === p.deviceSku) || skus[0];
       
@@ -2169,6 +2187,32 @@
       } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-envelope"></i><span>Email Document</span>'; }
       }
+    }
+
+    function collectMonthlyPayment() {
+      const p = policies.find(x => x.id === currentCertificateId);
+      if (!p) return showToast('No policy selected.', 'error');
+      const term = p.termMonths || 12;
+      const paidMonths = p.paidMonths || 0;
+      if (p.paymentSchedule !== 'monthly') return showToast('This policy is not on a monthly plan.', 'error');
+      if (paidMonths >= term) return showToast('All months are already paid.', 'error');
+
+      const monthlyAmt = p.monthlyPayment || (p.totalPremium / term);
+      document.getElementById('stripeTxType').textContent = `Monthly Payment (Month ${paidMonths + 1} of ${term})`;
+      initiateRealStripePayment(
+        monthlyAmt,
+        `Monthly premium against ${p.id}`,
+        () => {
+          p.paidMonths = (p.paidMonths || 0) + 1;
+          savePolicy(p);
+          renderLedgerTable();
+          renderAnalytics();
+          viewCertificate(p.id);
+          showToast(`Month ${p.paidMonths}/${term} collected.`, 'success');
+        },
+        'monthly-' + p.id + '-' + (paidMonths + 1),
+        p.id
+      );
     }
 
     // ---- Stripe redirect-return handler (3D Secure / SCA) ----
